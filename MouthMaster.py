@@ -1,3 +1,7 @@
+"""
+MouthMaster
+"""
+
 import time
 import sys
 from machine import Pin

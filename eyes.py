@@ -1,5 +1,5 @@
 """
-CONDENSED BOARD VERSION
+Eyes.py
 """
 
 import time
@@ -18,8 +18,9 @@ mode = Pin(1, Pin.IN, Pin.PULL_UP)
 SDA = Pin(16, Pin.IN)
 SCL = Pin(17, Pin.IN)
 
-
-# Define servos
+#####################################################
+#                 Define servos                     #
+#####################################################
 servos = {
     "LR": Servo(pin_id=8),
     "UD": Servo(pin_id=9),
@@ -37,11 +38,14 @@ servo_limits = {
     "TR": (90, 30),
     "BR": (90, 140),
 }
+#####################################################
+
 
 def calibrate():
     for name, servo in servos.items():
 #         print("neutral position")  # Debug output
         servo.write(90)
+
 
 def neutral():
     eyes = list(servos.keys())[2:]  # Get last 4 servo names
@@ -52,6 +56,7 @@ def neutral():
         max_angle = servo_limits[servo][1]  # Get min angle
         servos[servo].write(max_angle)  # Move to min      
         
+
 def move_servo_random(servo):
     """Moves the servo to a random position within its defined range."""
     min_angle, max_angle = servo_limits[servo]  # Get range from dictionary
@@ -68,13 +73,15 @@ def move_servo_extremes(servo, delay): # Moves the servo between its min and max
     servos[servo].write(max_angle)  # Move to max position
     print(max_angle)
     time.sleep_ms(delay)
-    
+
+  
 def blink():
     lids = list(servos.keys())[-4:]  # Get last 4 servo names
     for servo in lids:
         min_angle = servo_limits[servo][0]  # Get min angle
         servos[servo].write(min_angle)  # Move to min
-        
+
+     
 def control_ud_and_lids(ud_angle): # Moves UD servo and makes TL/TR follow instantly based on UD's position
     # Get limits
     ud_min, ud_max = servo_limits["UD"]

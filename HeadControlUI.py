@@ -15,7 +15,10 @@ app = QApplication([])
 window = QWidget()
 main_layout = QHBoxLayout()  # Two columns side by side
 
-# First column of buttons (LED + Eyes)____________________________________
+
+#####################################################
+# First column of buttons (LED + Eyes)
+#####################################################
 column1 = QVBoxLayout()
 btn_on = QPushButton("DEBUG LED On")
 btn_off = QPushButton("DEBUG LED Off")
@@ -30,7 +33,10 @@ column1.addWidget(eyes_closed)
 column1.addWidget(eyes_open)
 column1.addWidget(move_eyes)
 
-# Second column of buttons (Eyebrows)__________________________________
+
+#####################################################
+# Second column of buttons (Eyebrows)
+#####################################################
 column2 = QVBoxLayout()
 null_btn = QPushButton("DEBUG NULL")
 brows_up = QPushButton("Raise Eyebrows")
@@ -45,7 +51,10 @@ column2.addWidget(brows_down)
 column2.addWidget(brows_happy)
 column2.addWidget(brows_angry)
 
-# Thhird column of buttons (Mouth)__________________________________
+
+#####################################################
+# Third column of buttons (Mouth)
+#####################################################
 column3 = QVBoxLayout()
 mouth_closed = QPushButton("Close Mouth")
 mouth_open = QPushButton("Open Mouth")
@@ -60,7 +69,10 @@ column3.addWidget(lips_down)
 column3.addWidget(lips_up)
 column3.addWidget(tongue_down)
 
-# 4th column of buttons (lips)__________________________________
+
+#####################################################
+#        4th column of buttons (lips)
+#####################################################
 column4 = QVBoxLayout()
 tongue_up = QPushButton("Tongue Up") 
 smile = QPushButton("Smile")
@@ -76,7 +88,10 @@ column4.addWidget(frown)
 column4.addWidget(wide)
 column4.addWidget(narrow)
 
-# Add to 5th column
+
+#####################################################
+#                 Add to 5th column
+#####################################################
 column5 = QVBoxLayout()
 diagram = QLabel()
 pixmap = QPixmap("image.png")  # Replace with your file path
