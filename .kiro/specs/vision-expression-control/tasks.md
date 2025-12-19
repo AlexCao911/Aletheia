@@ -71,13 +71,13 @@
     - **Property 8: Feature Normalization Invariance**
     - **Validates: Requirements 4.10**
 
-- [ ] 6. Checkpoint - Ensure all tests pass
+- [x] 6. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Phase 5: Data Collection System
 
-- [ ] 7. Implement data collection and serialization
-  - [ ] 7.1 Create TrainingDataSample dataclass with JSON serialization
+- [x] 7. Implement data collection and serialization
+  - [x] 7.1 Create TrainingDataSample dataclass with JSON serialization
     - Create `expression_control/data.py`
     - Implement `to_dict()`, `from_dict()`, `to_json()`, `from_json()` methods
     - Define JSON schema for dataset format
@@ -85,13 +85,13 @@
   - [ ]* 7.2 Write property test for training data round-trip
     - **Property 3: Training Data Round-Trip Consistency**
     - **Validates: Requirements 3.6, 3.7**
-  - [ ] 7.3 Implement DataCollector class
+  - [x] 7.3 Implement DataCollector class
     - Create `expression_control/collector.py`
     - Implement `record_session()` with synchronized capture
     - Implement `save_dataset()` with JSON export
     - Support expression label annotation
     - _Requirements: 3.1, 3.4, 3.8_
-  - [ ] 7.4 Implement ExpressionDataset for PyTorch
+  - [x] 7.4 Implement ExpressionDataset for PyTorch
     - Create `expression_control/dataset.py`
     - Implement sequence creation from samples
     - Implement data augmentation (temporal jittering, noise)
