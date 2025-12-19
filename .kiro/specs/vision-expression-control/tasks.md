@@ -14,8 +14,8 @@
 
 ## Phase 2: Communication Protocol
 
-- [ ] 2. Implement servo command protocol
-  - [ ] 2.1 Implement ServoCommandProtocol encoder and decoder
+- [x] 2. Implement servo command protocol
+  - [x] 2.1 Implement ServoCommandProtocol encoder and decoder
     - Create `expression_control/protocol.py`
     - Implement `encode()` method for angles dict to command string
     - Implement `decode()` method for command string to angles dict
@@ -27,33 +27,33 @@
   - [ ]* 2.3 Write property test for angle range validation
     - **Property 2: Angle Range Validation**
     - **Validates: Requirements 2.6**
-  - [ ] 2.4 Implement SerialManager for USB communication
+  - [x] 2.4 Implement SerialManager for USB communication
     - Create `expression_control/serial_manager.py`
     - Implement connection management, send_angles(), send_command()
     - _Requirements: 2.4, 2.5_
 
-- [ ] 3. Checkpoint - Ensure all tests pass
+- [x] 3. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Phase 3: MouthMaster Pico Firmware Update
 
-- [ ] 4. Update MouthMaster Pico firmware for batch angle commands
-  - [ ] 4.1 Add angle command parser to MouthMaster.py
+- [x] 4. Update MouthMaster Pico firmware for batch angle commands
+  - [x] 4.1 Add angle command parser to MouthMaster.py
     - Parse "angles:A1,A2,...,A21" format
     - Extract 21 angle values and distribute to servos
     - _Requirements: 2.3, 2.4_
-  - [ ] 4.2 Implement GPIO signal translation for Eyes and Brows
+  - [x] 4.2 Implement GPIO signal translation for Eyes and Brows
     - Map angle ranges to GPIO signal patterns (SDA/SCL, BSDA/BSCL)
     - Maintain backward compatibility with existing commands
     - _Requirements: 1.3, 1.5_
-  - [ ] 4.3 Add angle readback capability for data collection
+  - [x] 4.3 Add angle readback capability for data collection
     - Implement command to report current servo angles
     - _Requirements: 3.1_
 
 ## Phase 4: MediaPipe Feature Extraction
 
-- [ ] 5. Implement MediaPipe face feature extractor
-  - [ ] 5.1 Create FaceFeatures dataclass
+- [x] 5. Implement MediaPipe face feature extractor
+  - [x] 5.1 Create FaceFeatures dataclass
     - Create `expression_control/features.py`
     - Implement all 14 feature fields with proper types
     - Implement `to_array()` and `from_array()` methods
@@ -61,7 +61,7 @@
   - [ ]* 5.2 Write property test for feature extraction completeness
     - **Property 4: Feature Extraction Completeness**
     - **Validates: Requirements 4.2**
-  - [ ] 5.3 Implement FaceFeatureExtractor class
+  - [x] 5.3 Implement FaceFeatureExtractor class
     - Create `expression_control/extractor.py`
     - Initialize MediaPipe Face Mesh with 478 landmarks
     - Extract eye aspect ratios, mouth features, eyebrow positions, head pose
