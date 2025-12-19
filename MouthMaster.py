@@ -1,5 +1,6 @@
 """
 MouthMaster
+25.12.15
 """
 
 import time
@@ -70,10 +71,13 @@ servos = {
     "LLL": SCFG(8, (10,170)),
     "LLR": SCFG(9, (80,100)),
 
-    "CUL": SCFG(10, (80,100)), # Check 
+    # i'm not sure what "C" stands for 
+    # cheeks? corner of mouth? 
+    "CUL": SCFG(10, (80,100)), 
     "CUR": SCFG(11, (80,100)),
     "CLL": SCFG(12, (80,100)),
     "CLR": SCFG(13, (80,100)),
+    # ---------------------------------
 
     "TON": SCFG(14, (80,100)), # Tongue
     "EXA": SCFG(15, (80,100)), 

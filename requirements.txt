@@ -1,2 +1,22 @@
-pyserial
+# Expression Control System Dependencies
+# Production requirements for vision-driven robot expression control
+
+# Vision Processing
+mediapipe>=0.10.0
+opencv-python>=4.8.0
+
+# Neural Network / Deep Learning
+torch>=2.0.0
+ncps>=0.0.7
+
+# Model Deployment
+onnxruntime>=1.15.0
+
+# Hardware Communication
+pyserial>=3.5
+
+# Core utilities
+numpy>=1.24.0
+
+# UI (existing dependency)
 PySide6

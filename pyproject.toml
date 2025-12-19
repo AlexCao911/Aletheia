@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "expression_control"
+version = "0.1.0"
+description = "Vision-driven robot expression control system using MediaPipe and LNN-S4"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Expression Control Team"}
+]
+keywords = ["robotics", "expression", "mediapipe", "neural-network", "servo-control"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "mediapipe>=0.10.0",
+    "ncps>=0.0.7",
+    "torch>=2.0.0",
+    "onnxruntime>=1.15.0",
+    "pyserial>=3.5",
+    "opencv-python>=4.8.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "hypothesis>=6.82.0",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.5.0",
+]
+
+[project.scripts]
+expression-train = "expression_control.cli.train:main"
+expression-export = "expression_control.cli.export:main"
+expression-run = "expression_control.cli.run:main"
+expression-evaluate = "expression_control.cli.evaluate:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["expression_control*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 100
+target-version = ["py39", "py310", "py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true

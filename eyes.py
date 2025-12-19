@@ -1,5 +1,6 @@
 """
 Eyes.py
+25.12.15
 """
 
 import time
@@ -22,12 +23,12 @@ SCL = Pin(17, Pin.IN)
 #                 Define servos                     #
 #####################################################
 servos = {
-    "LR": Servo(pin_id=8),
-    "UD": Servo(pin_id=9),
-    "TL": Servo(pin_id=13),
-    "BL": Servo(pin_id=12),
-    "TR": Servo(pin_id=11),
-    "BR": Servo(pin_id=10),
+    "LR": Servo(pin_id=8),      # left-right
+    "UD": Servo(pin_id=9),      # up-down
+    "TL": Servo(pin_id=13),     # top-left
+    "BL": Servo(pin_id=12),     # bottom-right
+    "TR": Servo(pin_id=11),     # top-right
+    "BR": Servo(pin_id=10),     # bottom-right
 }
 
 servo_limits = {
