@@ -99,13 +99,13 @@
 
 ## Phase 6: LNN-S4 Model Implementation
 
-- [ ] 8. Implement Liquid-S4 model architecture
-  - [ ] 8.1 Implement S4Layer class
+- [x] 8. Implement Liquid-S4 model architecture
+  - [x] 8.1 Implement S4Layer class
     - Create `expression_control/models/s4.py`
     - Implement structured state space layer with HiPPO initialization
     - Implement forward pass with state management
     - _Requirements: 4.6_
-  - [ ] 8.2 Implement LiquidS4Model class
+  - [x] 8.2 Implement LiquidS4Model class
     - Create `expression_control/models/liquid_s4.py`
     - Integrate S4 layers with ncps LTC layer
     - Implement embedding, S4 blocks, output head
@@ -113,11 +113,11 @@
   - [ ]* 8.3 Write property test for model output validity
     - **Property 5: Model Output Validity**
     - **Validates: Requirements 4.4**
-  - [ ] 8.4 Implement LNNS4Config dataclass
+  - [x] 8.4 Implement LNNS4Config dataclass
     - Define all model hyperparameters
     - _Requirements: 4.7_
 
-- [ ] 9. Checkpoint - Ensure all tests pass
+- [x] 9. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Phase 7: Training Pipeline
