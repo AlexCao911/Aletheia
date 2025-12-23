@@ -153,7 +153,7 @@
     - Implement exponential moving average smoothing
     - Implement reset() for new sequences
     - _Requirements: 6.2_
-  - [ ]* 11.2 Write property test for EMA smoothing bounds
+  - [x] 11.2 Write property test for EMA smoothing bounds
     - **Property 11: EMA Smoothing Bounds**
     - **Validates: Requirements 6.2**
 
