@@ -159,13 +159,13 @@
 
 ## Phase 9: Inference System
 
-- [ ] 12. Implement real-time inference engine
-  - [ ] 12.1 Implement LNNS4Inference class for ONNX runtime
+- [x] 12. Implement real-time inference engine
+  - [x] 12.1 Implement LNNS4Inference class for ONNX runtime
     - Create `expression_control/inference.py`
     - Load ONNX model with onnxruntime
     - Implement predict() with state management
     - _Requirements: 4.3, 4.4_
-  - [ ] 12.2 Implement InferenceEngine with full pipeline
+  - [x] 12.2 Implement InferenceEngine with full pipeline
     - Integrate camera, MediaPipe, model, smoother, serial
     - Implement face detection timeout (500ms → neutral)
     - Implement fallback mode (direct MediaPipe mapping)
@@ -176,16 +176,16 @@
   - [ ]* 12.4 Write property test for fallback mode validity
     - **Property 12: Fallback Mode Validity**
     - **Validates: Requirements 6.8**
-  - [ ] 12.5 Implement configuration interface
+  - [x] 12.5 Implement configuration interface
     - Create config file for sensitivity, smoothing parameters
     - Support runtime model switching
     - _Requirements: 6.4, 6.7_
-  - [ ] 12.6 Create inference CLI script
+  - [x] 12.6 Create inference CLI script
     - Create `expression_control/cli/run.py`
     - Implement main loop with performance logging
     - _Requirements: 6.5, 6.6_
 
-- [ ] 13. Checkpoint - Ensure all tests pass
+- [x] 13. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Phase 10: Integration and Testing
