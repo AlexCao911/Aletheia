@@ -122,8 +122,8 @@
 
 ## Phase 7: Training Pipeline
 
-- [ ] 10. Implement training infrastructure
-  - [ ] 10.1 Implement Trainer class
+- [x] 10. Implement training infrastructure
+  - [x] 10.1 Implement Trainer class
     - Create `expression_control/trainer.py`
     - Implement train_epoch(), validate(), train() methods
     - Implement checkpoint saving and loading
@@ -135,11 +135,11 @@
   - [ ]* 10.3 Write property test for metric computation
     - **Property 10: Metric Computation Correctness**
     - **Validates: Requirements 5.6**
-  - [ ] 10.4 Implement ONNX export functionality
+  - [x] 10.4 Implement ONNX export functionality
     - Add export_onnx() method to Trainer
     - Verify exported model produces same outputs
     - _Requirements: 5.5_
-  - [ ] 10.5 Create training CLI scripts
+  - [x] 10.5 Create training CLI scripts
     - Create `expression_control/cli/train.py`
     - Create `expression_control/cli/export.py`
     - Create `expression_control/cli/evaluate.py`
@@ -147,8 +147,8 @@
 
 ## Phase 8: Temporal Smoothing
 
-- [ ] 11. Implement temporal smoothing
-  - [ ] 11.1 Implement TemporalSmoother class with EMA
+- [-] 11. Implement temporal smoothing
+  - [x] 11.1 Implement TemporalSmoother class with EMA
     - Create `expression_control/smoother.py`
     - Implement exponential moving average smoothing
     - Implement reset() for new sequences

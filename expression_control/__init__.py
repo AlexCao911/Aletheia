@@ -8,8 +8,10 @@ __version__ = "0.1.0"
 
 from expression_control.protocol import ServoCommandProtocol
 from expression_control.serial_manager import SerialManager
+from expression_control.smoother import TemporalSmoother
 
 __all__ = [
     "ServoCommandProtocol",
     "SerialManager",
+    "TemporalSmoother",
 ]
