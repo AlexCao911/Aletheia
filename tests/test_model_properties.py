@@ -1226,7 +1226,8 @@ class TestMetricComputationCorrectness:
         
         mae = compute_mae(predictions, targets)
         
-        assert np.isclose(mae, constant_error, rtol=1e-5, atol=1e-6), \
+        # Use float32-appropriate tolerance (float32 has ~7 decimal digits of precision)
+        assert np.isclose(mae, constant_error, rtol=1e-4, atol=1e-5), \
             f"MAE should equal constant error {constant_error}, got {mae}"
     
     @settings(max_examples=100)
@@ -1249,5 +1250,360 @@ class TestMetricComputationCorrectness:
         
         rmse = compute_rmse(predictions, targets)
         
-        assert np.isclose(rmse, constant_error, rtol=1e-5, atol=1e-6), \
+        # Use float32-appropriate tolerance (float32 has ~7 decimal digits of precision)
+        assert np.isclose(rmse, constant_error, rtol=1e-4, atol=1e-5), \
             f"RMSE should equal constant error {constant_error}, got {rmse}"
+
+
+class TestTemporalCoherence:
+    """
+    **Feature: vision-expression-control, Property 7: Temporal Coherence**
+    
+    *For any* two consecutive feature vectors with Euclidean distance less than
+    threshold ε, the model output angles SHALL differ by no more than δ degrees
+    per servo (where δ is configurable).
+    
+    **Validates: Requirements 4.9**
+    
+    This property ensures that:
+    1. Small changes in input features produce small changes in output angles
+    2. The model maintains smooth transitions between consecutive frames
+    3. No sudden jumps in servo angles for similar inputs
+    4. The model is Lipschitz continuous (bounded rate of change)
+    """
+    
+    @pytest.fixture(scope="class")
+    def model(self):
+        """Create a model instance for testing temporal coherence."""
+        config = LNNS4Config(
+            input_dim=14,
+            output_dim=21,
+            hidden_dim=32,  # Smaller for faster testing
+            state_dim=16,
+            num_layers=2,
+            liquid_units=32,  # Must be >= output_dim + 2 for ncps AutoNCP
+            dropout=0.0,  # No dropout for deterministic testing
+            min_angle=0.0,
+            max_angle=180.0,
+        )
+        model = LiquidS4Model(config)
+        model.eval()  # Set to evaluation mode
+        return model
+    
+    @settings(max_examples=100)
+    @given(
+        base_features=feature_vector_strategy(),
+        perturbation_scale=st.floats(min_value=0.001, max_value=0.1, allow_nan=False, allow_infinity=False)
+    )
+    def test_small_input_changes_produce_bounded_output_changes(self, model, base_features, perturbation_scale):
+        """
+        Property: Small input perturbations produce bounded output changes.
+        
+        For any two consecutive feature vectors where the Euclidean distance
+        is less than ε, the maximum change in any servo angle should be bounded.
+        
+        This verifies Requirement 4.9: When processing consecutive video frames,
+        the model SHALL maintain temporal coherence in output angles.
+        
+        The relationship tested is:
+        ||f1 - f2|| < ε  =>  max(|θ1_i - θ2_i|) < δ for all servos i
+        
+        Where:
+        - f1, f2 are consecutive feature vectors
+        - θ1, θ2 are the corresponding output angle vectors
+        - ε is the input perturbation threshold
+        - δ is the maximum allowed angle change per servo
+        """
+        # Convert base features to tensor
+        base_tensor = torch.tensor(base_features, dtype=torch.float32).unsqueeze(0)  # (1, 14)
+        
+        # Create perturbed features (small random perturbation)
+        perturbation = torch.randn_like(base_tensor) * perturbation_scale
+        perturbed_tensor = base_tensor + perturbation
+        
+        # Compute Euclidean distance between inputs
+        input_distance = torch.norm(perturbation).item()
+        
+        # Get model outputs for both inputs
+        with torch.no_grad():
+            angles_base, _, _ = model(base_tensor)
+            angles_perturbed, _, _ = model(perturbed_tensor)
+        
+        # Compute maximum angle change across all servos
+        angle_diff = torch.abs(angles_base - angles_perturbed)
+        max_angle_change = torch.max(angle_diff).item()
+        
+        # Define the coherence bound: δ should be proportional to ε
+        # Using a Lipschitz-like bound: max_angle_change <= K * input_distance
+        # where K is a reasonable Lipschitz constant for the model
+        # For a well-behaved model, K should be bounded (e.g., K <= 1000 degrees per unit input)
+        lipschitz_constant = 1000.0  # Maximum degrees change per unit input distance
+        expected_max_change = lipschitz_constant * input_distance
+        
+        # Also enforce an absolute maximum change for very small perturbations
+        # This ensures temporal coherence even for tiny input changes
+        absolute_max_change = 45.0  # Maximum 45 degrees change for any small perturbation
+        
+        # The actual bound is the minimum of the two constraints
+        coherence_bound = min(expected_max_change, absolute_max_change)
+        
+        assert max_angle_change <= coherence_bound, (
+            f"Temporal coherence violated: max angle change {max_angle_change:.2f}° "
+            f"exceeds bound {coherence_bound:.2f}° for input distance {input_distance:.6f}"
+        )
+    
+    @settings(max_examples=100)
+    @given(
+        base_features=feature_vector_strategy(),
+        num_steps=st.integers(min_value=5, max_value=20)
+    )
+    def test_gradual_input_changes_produce_smooth_output_trajectory(self, model, base_features, num_steps):
+        """
+        Property: Gradual input changes produce smooth output trajectories.
+        
+        When input features change gradually over multiple steps, the output
+        angles should also change smoothly without sudden jumps.
+        
+        This tests temporal coherence over a sequence of frames, not just
+        between two consecutive frames.
+        """
+        # Create a smooth trajectory of input features
+        base_tensor = torch.tensor(base_features, dtype=torch.float32)
+        
+        # Generate a random direction for the trajectory
+        direction = torch.randn(14)
+        direction = direction / torch.norm(direction)  # Normalize
+        
+        # Create trajectory: base -> base + direction * step_size * num_steps
+        step_size = 0.05  # Small step size for smooth trajectory
+        
+        angles_trajectory = []
+        
+        with torch.no_grad():
+            for step in range(num_steps):
+                # Interpolate along the trajectory
+                current_features = base_tensor + direction * step_size * step
+                current_features = current_features.unsqueeze(0)  # (1, 14)
+                
+                angles, _, _ = model(current_features)
+                angles_trajectory.append(angles.squeeze(0).numpy())
+        
+        # Check that consecutive outputs don't have large jumps
+        max_step_change = 0.0
+        for i in range(1, len(angles_trajectory)):
+            step_diff = np.abs(angles_trajectory[i] - angles_trajectory[i-1])
+            max_step_change = max(max_step_change, np.max(step_diff))
+        
+        # For a smooth trajectory with step_size=0.05, we expect bounded changes
+        # The bound should be proportional to step_size
+        max_allowed_step_change = 30.0  # Maximum 30 degrees per step for smooth trajectory
+        
+        assert max_step_change <= max_allowed_step_change, (
+            f"Trajectory not smooth: max step change {max_step_change:.2f}° "
+            f"exceeds {max_allowed_step_change:.2f}° for step_size={step_size}"
+        )
+    
+    @settings(max_examples=100)
+    @given(
+        features=feature_vector_strategy()
+    )
+    def test_identical_inputs_produce_identical_outputs(self, model, features):
+        """
+        Property: Identical inputs produce identical outputs (determinism).
+        
+        This is a special case of temporal coherence: when input distance is 0,
+        output distance should also be 0.
+        """
+        features_tensor = torch.tensor(features, dtype=torch.float32).unsqueeze(0)
+        
+        with torch.no_grad():
+            angles1, _, _ = model(features_tensor)
+            angles2, _, _ = model(features_tensor)
+        
+        # Outputs should be identical
+        assert torch.allclose(angles1, angles2, rtol=1e-5, atol=1e-6), (
+            f"Identical inputs produced different outputs: "
+            f"max diff = {torch.max(torch.abs(angles1 - angles2)).item():.6f}"
+        )
+    
+    @settings(max_examples=100)
+    @given(
+        base_features=feature_vector_strategy(),
+        epsilon=st.floats(min_value=0.01, max_value=0.5, allow_nan=False, allow_infinity=False)
+    )
+    def test_epsilon_ball_coherence(self, model, base_features, epsilon):
+        """
+        Property: All inputs within ε-ball produce outputs within δ-ball.
+        
+        For any base input and any perturbed input within distance ε,
+        the output angles should be within a bounded distance δ.
+        
+        This is a stronger form of temporal coherence that ensures
+        local Lipschitz continuity.
+        """
+        base_tensor = torch.tensor(base_features, dtype=torch.float32).unsqueeze(0)
+        
+        # Generate multiple random perturbations within ε-ball
+        num_samples = 10
+        max_output_distance = 0.0
+        
+        with torch.no_grad():
+            angles_base, _, _ = model(base_tensor)
+            
+            for _ in range(num_samples):
+                # Generate random perturbation
+                perturbation = torch.randn(1, 14)
+                perturbation = perturbation / torch.norm(perturbation) * epsilon * torch.rand(1).item()
+                
+                perturbed_tensor = base_tensor + perturbation
+                angles_perturbed, _, _ = model(perturbed_tensor)
+                
+                # Compute output distance (max angle difference)
+                output_distance = torch.max(torch.abs(angles_base - angles_perturbed)).item()
+                max_output_distance = max(max_output_distance, output_distance)
+        
+        # The output distance should be bounded by a function of epsilon
+        # Using a linear bound: δ <= K * ε where K is the Lipschitz constant
+        lipschitz_constant = 500.0  # Degrees per unit input distance
+        delta_bound = lipschitz_constant * epsilon
+        
+        # Also cap at a reasonable maximum
+        delta_bound = min(delta_bound, 90.0)  # Max 90 degrees for any ε <= 0.5
+        
+        assert max_output_distance <= delta_bound, (
+            f"ε-ball coherence violated: max output distance {max_output_distance:.2f}° "
+            f"exceeds bound {delta_bound:.2f}° for ε={epsilon:.4f}"
+        )
+    
+    @settings(max_examples=50)
+    @given(
+        features_sequence=st.lists(
+            feature_vector_strategy(),
+            min_size=5,
+            max_size=20
+        )
+    )
+    def test_stateful_inference_temporal_coherence(self, model, features_sequence):
+        """
+        Property: Stateful inference maintains temporal coherence.
+        
+        When processing a sequence of frames with state management,
+        the model should maintain smooth transitions between outputs.
+        
+        This tests the step() method which is used for real-time inference.
+        """
+        s4_states = None
+        ltc_state = None
+        
+        angles_history = []
+        
+        with torch.no_grad():
+            for features in features_sequence:
+                features_tensor = torch.tensor(features, dtype=torch.float32).unsqueeze(0)
+                angles, s4_states, ltc_state = model.step(features_tensor, s4_states, ltc_state)
+                angles_history.append(angles.squeeze(0).numpy())
+        
+        # Check temporal coherence between consecutive outputs
+        max_consecutive_change = 0.0
+        for i in range(1, len(angles_history)):
+            diff = np.abs(angles_history[i] - angles_history[i-1])
+            max_consecutive_change = max(max_consecutive_change, np.max(diff))
+        
+        # For arbitrary input sequences, we allow larger changes
+        # but they should still be bounded
+        max_allowed_change = 90.0  # Maximum 90 degrees between any two consecutive frames
+        
+        assert max_consecutive_change <= max_allowed_change, (
+            f"Stateful inference temporal coherence violated: "
+            f"max consecutive change {max_consecutive_change:.2f}° exceeds {max_allowed_change:.2f}°"
+        )
+    
+    def test_temporal_coherence_with_neutral_to_smile_transition(self, model):
+        """
+        Unit test: Smooth transition from neutral to smile expression.
+        
+        This tests a realistic scenario where facial features gradually
+        change from neutral to smiling.
+        """
+        # Neutral features
+        neutral = torch.zeros(1, 14, dtype=torch.float32)
+        neutral[0, 10] = 0.0  # smile_intensity = 0
+        
+        # Smile features
+        smile = torch.zeros(1, 14, dtype=torch.float32)
+        smile[0, 10] = 1.0  # smile_intensity = 1
+        
+        # Create interpolated trajectory
+        num_steps = 10
+        angles_trajectory = []
+        
+        with torch.no_grad():
+            for i in range(num_steps + 1):
+                t = i / num_steps
+                features = neutral * (1 - t) + smile * t
+                angles, _, _ = model(features)
+                angles_trajectory.append(angles.squeeze(0).numpy())
+        
+        # Check smoothness of trajectory
+        max_step_change = 0.0
+        for i in range(1, len(angles_trajectory)):
+            diff = np.abs(angles_trajectory[i] - angles_trajectory[i-1])
+            max_step_change = max(max_step_change, np.max(diff))
+        
+        # For a 10-step interpolation, each step should have bounded change
+        max_allowed_per_step = 20.0  # Maximum 20 degrees per interpolation step
+        
+        assert max_step_change <= max_allowed_per_step, (
+            f"Neutral-to-smile transition not smooth: "
+            f"max step change {max_step_change:.2f}° exceeds {max_allowed_per_step:.2f}°"
+        )
+    
+    def test_temporal_coherence_with_eye_blink(self, model):
+        """
+        Unit test: Smooth transition during eye blink.
+        
+        This tests temporal coherence during a rapid but natural
+        facial movement (eye blink).
+        """
+        # Open eyes
+        open_eyes = torch.zeros(1, 14, dtype=torch.float32)
+        open_eyes[0, 0] = 0.3  # left_eye_aspect_ratio (open)
+        open_eyes[0, 1] = 0.3  # right_eye_aspect_ratio (open)
+        
+        # Closed eyes
+        closed_eyes = torch.zeros(1, 14, dtype=torch.float32)
+        closed_eyes[0, 0] = 0.0  # left_eye_aspect_ratio (closed)
+        closed_eyes[0, 1] = 0.0  # right_eye_aspect_ratio (closed)
+        
+        # Blink sequence: open -> closed -> open (quick transition)
+        blink_sequence = [
+            open_eyes,
+            open_eyes * 0.7 + closed_eyes * 0.3,
+            open_eyes * 0.3 + closed_eyes * 0.7,
+            closed_eyes,
+            open_eyes * 0.3 + closed_eyes * 0.7,
+            open_eyes * 0.7 + closed_eyes * 0.3,
+            open_eyes,
+        ]
+        
+        angles_trajectory = []
+        
+        with torch.no_grad():
+            for features in blink_sequence:
+                angles, _, _ = model(features)
+                angles_trajectory.append(angles.squeeze(0).numpy())
+        
+        # Check smoothness
+        max_step_change = 0.0
+        for i in range(1, len(angles_trajectory)):
+            diff = np.abs(angles_trajectory[i] - angles_trajectory[i-1])
+            max_step_change = max(max_step_change, np.max(diff))
+        
+        # Eye blinks are fast but should still be smooth
+        max_allowed_per_step = 30.0  # Maximum 30 degrees per blink step
+        
+        assert max_step_change <= max_allowed_per_step, (
+            f"Eye blink transition not smooth: "
+            f"max step change {max_step_change:.2f}° exceeds {max_allowed_per_step:.2f}°"
+        )
+

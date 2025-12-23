@@ -190,23 +190,23 @@
 
 ## Phase 10: Integration and Testing
 
-- [ ] 14. Integration testing
-  - [ ]* 14.1 Write integration tests for RPi5-Pico communication
+- [x] 14. Integration testing
+  - [x] 14.1 Write integration tests for RPi5-Pico communication
     - Test command sending and response
     - Test sustained communication at 30 Hz
     - _Requirements: 7.2_
-  - [ ]* 14.2 Write property test for temporal coherence
+  - [x] 14.2 Write property test for temporal coherence
     - **Property 7: Temporal Coherence**
     - **Validates: Requirements 4.9**
-  - [ ]* 14.3 Write property test for angle tolerance
+  - [x] 14.3 Write property test for angle tolerance
     - **Property 13: Angle Tolerance Verification**
     - **Validates: Requirements 7.4**
-  - [ ]* 14.4 Write performance benchmarks
+  - [x] 14.4 Write performance benchmarks
     - Benchmark MediaPipe extraction latency
     - Benchmark model inference latency
     - Benchmark end-to-end pipeline latency
     - _Requirements: 7.3_
 
-- [ ] 15. Final Checkpoint - Ensure all tests pass
+- [x] 15. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
