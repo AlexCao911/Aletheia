@@ -110,7 +110,7 @@
     - Integrate S4 layers with ncps LTC layer
     - Implement embedding, S4 blocks, output head
     - _Requirements: 4.3, 4.4, 4.6_
-  - [ ]* 8.3 Write property test for model output validity
+  - [x] 8.3 Write property test for model output validity
     - **Property 5: Model Output Validity**
     - **Validates: Requirements 4.4**
   - [x] 8.4 Implement LNNS4Config dataclass
