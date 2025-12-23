@@ -58,7 +58,7 @@
     - Implement all 14 feature fields with proper types
     - Implement `to_array()` and `from_array()` methods
     - _Requirements: 4.2_
-  - [ ]* 5.2 Write property test for feature extraction completeness
+  - [x] 5.2 Write property test for feature extraction completeness
     - **Property 4: Feature Extraction Completeness**
     - **Validates: Requirements 4.2**
   - [x] 5.3 Implement FaceFeatureExtractor class
@@ -67,7 +67,7 @@
     - Extract eye aspect ratios, mouth features, eyebrow positions, head pose
     - Normalize coordinates relative to face bounding box
     - _Requirements: 4.1, 4.2, 4.10_
-  - [ ]* 5.4 Write property test for feature normalization
+  - [x] 5.4 Write property test for feature normalization
     - **Property 8: Feature Normalization Invariance**
     - **Validates: Requirements 4.10**
 
