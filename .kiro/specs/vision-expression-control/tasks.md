@@ -129,7 +129,7 @@
     - Implement checkpoint saving and loading
     - Implement early stopping
     - _Requirements: 5.3, 5.4, 5.6, 5.8_
-  - [ ]* 10.2 Write property test for checkpoint round-trip
+  - [x] 10.2 Write property test for checkpoint round-trip
     - **Property 9: Checkpoint Round-Trip Consistency**
     - **Validates: Requirements 5.4**
   - [ ]* 10.3 Write property test for metric computation

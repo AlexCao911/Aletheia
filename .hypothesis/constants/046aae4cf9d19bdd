@@ -1,0 +1,4 @@
+# file: /Users/caokaixiang/Downloads/Head_α2.0.33/Code/expression_control/dataset.py
+# hypothesis_version: 6.148.7
+
+[1e-06, 0.02, 0.1, 0.3, 0.8, 1.0, 180.0, '.', '.json', 'ExpressionDataset', 'w']

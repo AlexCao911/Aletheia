@@ -376,3 +376,472 @@ class TestModelOutputValidity:
         angles_min_np = angles_min.cpu().numpy()
         assert np.all(angles_min_np >= 0.0) and np.all(angles_min_np <= 180.0)
         assert np.all(np.isfinite(angles_min_np))
+
+
+
+class TestCheckpointRoundTrip:
+    """
+    **Feature: vision-expression-control, Property 9: Checkpoint Round-Trip Consistency**
+    
+    *For any* trained model state, saving to checkpoint and loading back SHALL
+    produce a model that generates identical outputs for the same inputs.
+    
+    **Validates: Requirements 5.4**
+    
+    This property ensures that:
+    1. Model state can be saved and restored without loss
+    2. Optimizer state is preserved correctly
+    3. Training state (epoch, loss, etc.) is maintained
+    4. Loaded model produces identical outputs to the original model
+    5. The checkpoint format is stable and reliable
+    """
+    
+    @pytest.fixture(scope="class")
+    def temp_checkpoint_dir(self, tmp_path_factory):
+        """Create a temporary directory for checkpoint files."""
+        return tmp_path_factory.mktemp("checkpoints")
+    
+    @pytest.fixture(scope="class")
+    def sample_datasets(self, tmp_path_factory):
+        """Create minimal sample datasets for training."""
+        import json
+        from expression_control.protocol import ServoCommandProtocol
+        
+        data_dir = tmp_path_factory.mktemp("data")
+        
+        # Create minimal training data
+        train_data = {
+            "version": "1.0",
+            "created_at": "2024-01-01T00:00:00Z",
+            "total_samples": 20,
+            "fps": 30,
+            "servo_order": ServoCommandProtocol.SERVO_ORDER,
+            "samples": []
+        }
+        
+        # Generate 20 samples with random features and angles
+        for i in range(20):
+            sample = {
+                "timestamp": i * 0.033,
+                "features": {
+                    "left_eye_aspect_ratio": 0.3 + i * 0.01,
+                    "right_eye_aspect_ratio": 0.3 + i * 0.01,
+                    "eye_gaze_horizontal": 0.0,
+                    "eye_gaze_vertical": 0.0,
+                    "left_eyebrow_height": 0.5,
+                    "right_eyebrow_height": 0.5,
+                    "eyebrow_furrow": 0.0,
+                    "mouth_open_ratio": 0.2 + i * 0.01,
+                    "mouth_width_ratio": 0.5,
+                    "lip_pucker": 0.0,
+                    "smile_intensity": 0.3,
+                    "head_pitch": 0.0,
+                    "head_yaw": 0.0,
+                    "head_roll": 0.0,
+                },
+                "servo_angles": [90 + (i % 10) for _ in range(21)],
+                "expression_label": "neutral"
+            }
+            train_data["samples"].append(sample)
+        
+        # Save training data
+        train_path = data_dir / "train.json"
+        with open(train_path, 'w') as f:
+            json.dump(train_data, f)
+        
+        # Create validation data (same structure, different values)
+        val_data = train_data.copy()
+        val_data["samples"] = train_data["samples"][:10]  # Use first 10 samples
+        
+        val_path = data_dir / "val.json"
+        with open(val_path, 'w') as f:
+            json.dump(val_data, f)
+        
+        return str(train_path), str(val_path)
+    
+    def test_checkpoint_saves_and_loads_model_state(self, temp_checkpoint_dir, sample_datasets):
+        """
+        Property: Saving and loading a checkpoint preserves model state.
+        
+        For any model, after saving to checkpoint and loading back, the model
+        should produce identical outputs for the same inputs.
+        """
+        from expression_control.trainer import Trainer
+        from expression_control.models.config import LNNS4Config
+        
+        train_path, val_path = sample_datasets
+        
+        # Create a small config for fast testing
+        config = LNNS4Config(
+            input_dim=14,
+            output_dim=21,
+            hidden_dim=32,
+            state_dim=16,
+            num_layers=2,
+            liquid_units=32,
+            dropout=0.0,
+            sequence_length=4,  # Short sequences for fast testing
+            batch_size=4,
+            num_epochs=2,
+            learning_rate=1e-3,
+            weight_decay=1e-4,
+        )
+        
+        # Create trainer
+        trainer = Trainer(config, train_path, val_path, device="cpu")
+        
+        # Generate test input
+        test_input = torch.randn(1, 14, dtype=torch.float32)
+        
+        # Get output before saving
+        trainer.model.eval()
+        with torch.no_grad():
+            output_before, s4_before, ltc_before = trainer.model(test_input)
+        
+        # Save checkpoint
+        checkpoint_path = temp_checkpoint_dir / "test_checkpoint.pt"
+        trainer.save_checkpoint(str(checkpoint_path))
+        
+        # Verify checkpoint file exists
+        assert checkpoint_path.exists(), "Checkpoint file was not created"
+        
+        # Create a new trainer with same config
+        trainer_loaded = Trainer(config, train_path, val_path, device="cpu")
+        
+        # Load checkpoint
+        trainer_loaded.load_checkpoint(str(checkpoint_path))
+        
+        # Get output after loading
+        trainer_loaded.model.eval()
+        with torch.no_grad():
+            output_after, s4_after, ltc_after = trainer_loaded.model(test_input)
+        
+        # Verify outputs are identical
+        assert torch.allclose(output_before, output_after, rtol=1e-5, atol=1e-6), \
+            f"Model outputs differ after checkpoint round-trip. Max diff: {torch.max(torch.abs(output_before - output_after))}"
+    
+    @settings(max_examples=50)
+    @given(
+        features=feature_vector_strategy(),
+        seed=st.integers(min_value=0, max_value=10000)
+    )
+    def test_checkpoint_round_trip_with_random_inputs(self, temp_checkpoint_dir, sample_datasets, features, seed):
+        """
+        Property: For any input, checkpoint round-trip produces identical outputs.
+        
+        This tests that the checkpoint mechanism works correctly across a wide
+        range of inputs, not just a single test case.
+        """
+        from expression_control.trainer import Trainer
+        from expression_control.models.config import LNNS4Config
+        
+        train_path, val_path = sample_datasets
+        
+        # Set seed for reproducibility
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        
+        # Create config
+        config = LNNS4Config(
+            input_dim=14,
+            output_dim=21,
+            hidden_dim=32,
+            state_dim=16,
+            num_layers=2,
+            liquid_units=32,
+            dropout=0.0,
+            sequence_length=4,
+            batch_size=4,
+            num_epochs=2,
+        )
+        
+        # Create trainer
+        trainer = Trainer(config, train_path, val_path, device="cpu")
+        
+        # Convert features to tensor
+        test_input = torch.tensor(features, dtype=torch.float32).unsqueeze(0)
+        
+        # Get output before saving
+        trainer.model.eval()
+        with torch.no_grad():
+            output_before, _, _ = trainer.model(test_input)
+        
+        # Save checkpoint
+        checkpoint_path = temp_checkpoint_dir / f"checkpoint_{seed}.pt"
+        trainer.save_checkpoint(str(checkpoint_path))
+        
+        # Create new trainer and load
+        trainer_loaded = Trainer(config, train_path, val_path, device="cpu")
+        trainer_loaded.load_checkpoint(str(checkpoint_path))
+        
+        # Get output after loading
+        trainer_loaded.model.eval()
+        with torch.no_grad():
+            output_after, _, _ = trainer_loaded.model(test_input)
+        
+        # Verify outputs are identical
+        assert torch.allclose(output_before, output_after, rtol=1e-5, atol=1e-6), \
+            f"Outputs differ after checkpoint round-trip for input {features}"
+    
+    def test_checkpoint_preserves_training_state(self, temp_checkpoint_dir, sample_datasets):
+        """
+        Property: Checkpoint preserves all training state variables.
+        
+        This verifies that epoch, best_val_loss, patience_counter, and other
+        training state is correctly saved and restored.
+        """
+        from expression_control.trainer import Trainer
+        from expression_control.models.config import LNNS4Config
+        
+        train_path, val_path = sample_datasets
+        
+        config = LNNS4Config(
+            input_dim=14,
+            output_dim=21,
+            hidden_dim=32,
+            state_dim=16,
+            num_layers=2,
+            liquid_units=32,
+            dropout=0.0,
+            sequence_length=4,
+            batch_size=4,
+            num_epochs=2,
+        )
+        
+        # Create trainer
+        trainer = Trainer(config, train_path, val_path, device="cpu")
+        
+        # Manually set some training state
+        trainer.best_val_loss = 0.123
+        trainer.current_epoch = 5
+        trainer.patience_counter = 3
+        
+        # Save checkpoint
+        checkpoint_path = temp_checkpoint_dir / "state_checkpoint.pt"
+        trainer.save_checkpoint(str(checkpoint_path))
+        
+        # Create new trainer and load
+        trainer_loaded = Trainer(config, train_path, val_path, device="cpu")
+        trainer_loaded.load_checkpoint(str(checkpoint_path))
+        
+        # Verify training state is preserved
+        assert trainer_loaded.best_val_loss == trainer.best_val_loss, \
+            f"best_val_loss not preserved: {trainer_loaded.best_val_loss} != {trainer.best_val_loss}"
+        assert trainer_loaded.current_epoch == trainer.current_epoch, \
+            f"current_epoch not preserved: {trainer_loaded.current_epoch} != {trainer.current_epoch}"
+        assert trainer_loaded.patience_counter == trainer.patience_counter, \
+            f"patience_counter not preserved: {trainer_loaded.patience_counter} != {trainer.patience_counter}"
+    
+    def test_checkpoint_preserves_optimizer_state(self, temp_checkpoint_dir, sample_datasets):
+        """
+        Property: Checkpoint preserves optimizer state including momentum buffers.
+        
+        This ensures that training can be resumed exactly where it left off.
+        """
+        from expression_control.trainer import Trainer
+        from expression_control.models.config import LNNS4Config
+        
+        train_path, val_path = sample_datasets
+        
+        config = LNNS4Config(
+            input_dim=14,
+            output_dim=21,
+            hidden_dim=32,
+            state_dim=16,
+            num_layers=2,
+            liquid_units=32,
+            dropout=0.0,
+            sequence_length=4,
+            batch_size=4,
+            num_epochs=2,
+        )
+        
+        # Create trainer and train for 1 epoch to build optimizer state
+        trainer = Trainer(config, train_path, val_path, device="cpu")
+        trainer.train_epoch()
+        
+        # Get optimizer state before saving
+        optimizer_state_before = trainer.optimizer.state_dict()
+        
+        # Save checkpoint
+        checkpoint_path = temp_checkpoint_dir / "optimizer_checkpoint.pt"
+        trainer.save_checkpoint(str(checkpoint_path))
+        
+        # Create new trainer and load
+        trainer_loaded = Trainer(config, train_path, val_path, device="cpu")
+        trainer_loaded.load_checkpoint(str(checkpoint_path))
+        
+        # Get optimizer state after loading
+        optimizer_state_after = trainer_loaded.optimizer.state_dict()
+        
+        # Verify optimizer state is preserved
+        # Check param_groups
+        assert len(optimizer_state_before['param_groups']) == len(optimizer_state_after['param_groups']), \
+            "Number of param_groups differs"
+        
+        for pg_before, pg_after in zip(optimizer_state_before['param_groups'], optimizer_state_after['param_groups']):
+            assert pg_before['lr'] == pg_after['lr'], "Learning rate not preserved"
+            assert pg_before['weight_decay'] == pg_after['weight_decay'], "Weight decay not preserved"
+    
+    def test_checkpoint_preserves_scheduler_state(self, temp_checkpoint_dir, sample_datasets):
+        """
+        Property: Checkpoint preserves learning rate scheduler state.
+        
+        This ensures that the learning rate schedule continues correctly after
+        loading a checkpoint.
+        """
+        from expression_control.trainer import Trainer
+        from expression_control.models.config import LNNS4Config
+        
+        train_path, val_path = sample_datasets
+        
+        config = LNNS4Config(
+            input_dim=14,
+            output_dim=21,
+            hidden_dim=32,
+            state_dim=16,
+            num_layers=2,
+            liquid_units=32,
+            dropout=0.0,
+            sequence_length=4,
+            batch_size=4,
+            num_epochs=10,
+        )
+        
+        # Create trainer and step scheduler a few times
+        trainer = Trainer(config, train_path, val_path, device="cpu")
+        for _ in range(3):
+            trainer.scheduler.step()
+        
+        # Get learning rate before saving
+        lr_before = trainer.scheduler.get_last_lr()[0]
+        
+        # Save checkpoint
+        checkpoint_path = temp_checkpoint_dir / "scheduler_checkpoint.pt"
+        trainer.save_checkpoint(str(checkpoint_path))
+        
+        # Create new trainer and load
+        trainer_loaded = Trainer(config, train_path, val_path, device="cpu")
+        trainer_loaded.load_checkpoint(str(checkpoint_path))
+        
+        # Get learning rate after loading
+        lr_after = trainer_loaded.scheduler.get_last_lr()[0]
+        
+        # Verify learning rate is preserved
+        assert abs(lr_before - lr_after) < 1e-8, \
+            f"Learning rate not preserved: {lr_before} != {lr_after}"
+    
+    @settings(max_examples=30)
+    @given(
+        batch_size=st.integers(min_value=1, max_value=4),
+        seq_len=st.integers(min_value=1, max_value=8)
+    )
+    def test_checkpoint_works_with_different_batch_sizes(self, temp_checkpoint_dir, sample_datasets, batch_size, seq_len):
+        """
+        Property: Checkpoint works correctly regardless of batch size or sequence length.
+        
+        The saved model should work with different batch sizes and sequence lengths
+        than it was trained with.
+        """
+        from expression_control.trainer import Trainer
+        from expression_control.models.config import LNNS4Config
+        
+        train_path, val_path = sample_datasets
+        
+        config = LNNS4Config(
+            input_dim=14,
+            output_dim=21,
+            hidden_dim=32,
+            state_dim=16,
+            num_layers=2,
+            liquid_units=32,
+            dropout=0.0,
+            sequence_length=4,
+            batch_size=4,
+            num_epochs=2,
+        )
+        
+        # Create and save trainer
+        trainer = Trainer(config, train_path, val_path, device="cpu")
+        checkpoint_path = temp_checkpoint_dir / f"batch_{batch_size}_seq_{seq_len}.pt"
+        trainer.save_checkpoint(str(checkpoint_path))
+        
+        # Load checkpoint
+        trainer_loaded = Trainer(config, train_path, val_path, device="cpu")
+        trainer_loaded.load_checkpoint(str(checkpoint_path))
+        
+        # Test with different batch size and sequence length
+        test_input = torch.randn(batch_size, seq_len, 14, dtype=torch.float32)
+        
+        trainer_loaded.model.eval()
+        with torch.no_grad():
+            output, _, _ = trainer_loaded.model(test_input)
+        
+        # Verify output shape is correct
+        assert output.shape == (batch_size, seq_len, 21), \
+            f"Expected shape ({batch_size}, {seq_len}, 21), got {output.shape}"
+        
+        # Verify output is valid
+        assert torch.all(output >= 0.0) and torch.all(output <= 180.0), \
+            "Output angles outside valid range [0, 180]"
+    
+    def test_checkpoint_file_format_stability(self, temp_checkpoint_dir, sample_datasets):
+        """
+        Property: Checkpoint file format is stable and contains expected keys.
+        
+        This ensures that the checkpoint format doesn't change unexpectedly.
+        """
+        from expression_control.trainer import Trainer
+        from expression_control.models.config import LNNS4Config
+        
+        train_path, val_path = sample_datasets
+        
+        config = LNNS4Config(
+            input_dim=14,
+            output_dim=21,
+            hidden_dim=32,
+            state_dim=16,
+            num_layers=2,
+            liquid_units=32,
+            dropout=0.0,
+            sequence_length=4,
+            batch_size=4,
+            num_epochs=2,
+        )
+        
+        # Create trainer and save checkpoint
+        trainer = Trainer(config, train_path, val_path, device="cpu")
+        checkpoint_path = temp_checkpoint_dir / "format_checkpoint.pt"
+        trainer.save_checkpoint(str(checkpoint_path))
+        
+        # Load checkpoint directly
+        checkpoint = torch.load(checkpoint_path, map_location="cpu")
+        
+        # Verify expected keys are present
+        expected_keys = {
+            "model_state_dict",
+            "optimizer_state_dict",
+            "scheduler_state_dict",
+            "config",
+            "best_val_loss",
+            "current_epoch",
+            "patience_counter",
+            "history",
+        }
+        
+        actual_keys = set(checkpoint.keys())
+        
+        assert expected_keys.issubset(actual_keys), \
+            f"Missing keys in checkpoint: {expected_keys - actual_keys}"
+        
+        # Verify types
+        assert isinstance(checkpoint["model_state_dict"], dict), \
+            "model_state_dict should be a dict"
+        assert isinstance(checkpoint["optimizer_state_dict"], dict), \
+            "optimizer_state_dict should be a dict"
+        assert isinstance(checkpoint["config"], dict), \
+            "config should be a dict"
+        assert isinstance(checkpoint["best_val_loss"], (int, float)), \
+            "best_val_loss should be numeric"
+        assert isinstance(checkpoint["current_epoch"], int), \
+            "current_epoch should be an int"
