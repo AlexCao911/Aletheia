@@ -170,7 +170,7 @@
     - Implement face detection timeout (500ms → neutral)
     - Implement fallback mode (direct MediaPipe mapping)
     - _Requirements: 6.1, 6.3, 6.8_
-  - [ ]* 12.3 Write property test for face detection fallback
+  - [x] 12.3 Write property test for face detection fallback
     - **Property 6: Face Detection Fallback**
     - **Validates: Requirements 4.8**
   - [ ]* 12.4 Write property test for fallback mode validity
