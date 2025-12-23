@@ -1,8 +1,9 @@
 """
-Property-based tests for InferenceEngine face detection fallback.
+Property-based tests for InferenceEngine face detection fallback and fallback mode.
 
 These tests verify correctness properties of the inference engine's
-face detection fallback behavior using Hypothesis for property-based testing.
+face detection fallback behavior and fallback mode validity using 
+Hypothesis for property-based testing.
 """
 
 import pytest
@@ -353,3 +354,202 @@ class TestFaceDetectionFallback:
             decimal=10,  # High precision to verify exact preservation
             err_msg="Fallback should preserve exact angle values"
         )
+
+
+class TestFallbackModeValidity:
+    """
+    **Feature: vision-expression-control, Property 12: Fallback Mode Validity**
+    
+    *For any* valid FaceFeatures input, the direct MediaPipe-to-servo fallback 
+    mapping SHALL produce 21 servo angles, each within the range [0, 180].
+    
+    **Validates: Requirements 6.8**
+    
+    This property ensures that:
+    1. The fallback mapper always produces exactly 21 servo angles
+    2. All output angles are within the valid range [0, 180]
+    3. The mapping works correctly for all valid facial feature combinations
+    """
+    
+    @settings(max_examples=100)
+    @given(features=face_features_strategy())
+    def test_fallback_produces_21_angles(self, features):
+        """
+        Property: Fallback mapping produces exactly 21 servo angles.
+        
+        For any valid FaceFeatures input, the fallback mapper must output
+        an array of exactly 21 values corresponding to all servos.
+        """
+        mapper = FallbackMapper(sensitivity=1.0)
+        
+        angles = mapper.map_array(features)
+        
+        assert angles.shape == (21,), \
+            f"Expected 21 angles, got shape {angles.shape}"
+    
+    @settings(max_examples=100)
+    @given(features=face_features_strategy())
+    def test_fallback_angles_in_valid_range(self, features):
+        """
+        Property: All fallback angles are within [0, 180] range.
+        
+        For any valid FaceFeatures input, every output angle must be
+        within the valid servo range of 0 to 180 degrees.
+        """
+        mapper = FallbackMapper(sensitivity=1.0)
+        
+        angles = mapper.map_array(features)
+        
+        assert np.all(angles >= 0), \
+            f"Found angles below 0: {angles[angles < 0]}"
+        assert np.all(angles <= 180), \
+            f"Found angles above 180: {angles[angles > 180]}"
+    
+    @settings(max_examples=100)
+    @given(
+        features=face_features_strategy(),
+        sensitivity=st.floats(min_value=0.1, max_value=5.0, allow_nan=False, allow_infinity=False)
+    )
+    def test_fallback_valid_with_varying_sensitivity(self, features, sensitivity):
+        """
+        Property: Fallback produces valid angles regardless of sensitivity.
+        
+        For any valid FaceFeatures and any reasonable sensitivity value,
+        the output angles must still be within [0, 180].
+        """
+        mapper = FallbackMapper(sensitivity=sensitivity)
+        
+        angles = mapper.map_array(features)
+        
+        assert angles.shape == (21,), \
+            f"Expected 21 angles, got shape {angles.shape}"
+        assert np.all(angles >= 0), \
+            f"Found angles below 0 with sensitivity {sensitivity}: {angles[angles < 0]}"
+        assert np.all(angles <= 180), \
+            f"Found angles above 180 with sensitivity {sensitivity}: {angles[angles > 180]}"
+    
+    @settings(max_examples=100)
+    @given(features=face_features_strategy())
+    def test_fallback_dict_matches_array(self, features):
+        """
+        Property: Dictionary and array outputs are consistent.
+        
+        The map_features() dict output should contain the same values
+        as map_array() in the correct servo order.
+        """
+        mapper = FallbackMapper(sensitivity=1.0)
+        
+        angles_dict = mapper.map_features(features)
+        angles_array = mapper.map_array(features)
+        
+        # Verify dict has all 21 servos
+        assert len(angles_dict) == 21, \
+            f"Expected 21 servos in dict, got {len(angles_dict)}"
+        
+        # Verify all servo names are present
+        for servo_name in ServoCommandProtocol.SERVO_ORDER:
+            assert servo_name in angles_dict, \
+                f"Missing servo {servo_name} in dict output"
+        
+        # Verify dict values match array values in order
+        for i, servo_name in enumerate(ServoCommandProtocol.SERVO_ORDER):
+            assert angles_dict[servo_name] == int(angles_array[i]), \
+                f"Mismatch for {servo_name}: dict={angles_dict[servo_name]}, array={int(angles_array[i])}"
+    
+    @settings(max_examples=100)
+    @given(features=face_features_strategy())
+    def test_fallback_dict_values_in_valid_range(self, features):
+        """
+        Property: Dictionary output values are within [0, 180] range.
+        
+        For any valid FaceFeatures input, every value in the output
+        dictionary must be within the valid servo range.
+        """
+        mapper = FallbackMapper(sensitivity=1.0)
+        
+        angles_dict = mapper.map_features(features)
+        
+        for servo_name, angle in angles_dict.items():
+            assert 0 <= angle <= 180, \
+                f"Servo {servo_name} has invalid angle {angle}"
+    
+    def test_fallback_with_neutral_features(self):
+        """
+        Unit test: Fallback produces valid output for neutral features.
+        
+        Verifies that the neutral face position produces valid angles.
+        """
+        mapper = FallbackMapper(sensitivity=1.0)
+        features = FaceFeatures.neutral()
+        
+        angles = mapper.map_array(features)
+        
+        assert angles.shape == (21,)
+        assert np.all(angles >= 0)
+        assert np.all(angles <= 180)
+    
+    def test_fallback_with_extreme_features(self):
+        """
+        Unit test: Fallback handles extreme feature values correctly.
+        
+        Verifies that extreme (but valid) feature values still produce
+        angles within the valid range due to clamping.
+        """
+        mapper = FallbackMapper(sensitivity=1.0)
+        
+        # Create features with extreme values
+        extreme_features = FaceFeatures(
+            left_eye_aspect_ratio=1.0,
+            right_eye_aspect_ratio=1.0,
+            eye_gaze_horizontal=1.0,
+            eye_gaze_vertical=1.0,
+            left_eyebrow_height=1.0,
+            right_eyebrow_height=1.0,
+            eyebrow_furrow=1.0,
+            mouth_open_ratio=1.0,
+            mouth_width_ratio=1.0,
+            lip_pucker=1.0,
+            smile_intensity=1.0,
+            head_pitch=90.0,
+            head_yaw=90.0,
+            head_roll=90.0,
+        )
+        
+        angles = mapper.map_array(extreme_features)
+        
+        assert angles.shape == (21,)
+        assert np.all(angles >= 0), f"Found angles below 0: {angles[angles < 0]}"
+        assert np.all(angles <= 180), f"Found angles above 180: {angles[angles > 180]}"
+    
+    def test_fallback_with_minimum_features(self):
+        """
+        Unit test: Fallback handles minimum feature values correctly.
+        
+        Verifies that minimum (but valid) feature values still produce
+        angles within the valid range.
+        """
+        mapper = FallbackMapper(sensitivity=1.0)
+        
+        # Create features with minimum values
+        min_features = FaceFeatures(
+            left_eye_aspect_ratio=0.0,
+            right_eye_aspect_ratio=0.0,
+            eye_gaze_horizontal=-1.0,
+            eye_gaze_vertical=-1.0,
+            left_eyebrow_height=0.0,
+            right_eyebrow_height=0.0,
+            eyebrow_furrow=0.0,
+            mouth_open_ratio=0.0,
+            mouth_width_ratio=0.0,
+            lip_pucker=0.0,
+            smile_intensity=0.0,
+            head_pitch=-90.0,
+            head_yaw=-90.0,
+            head_roll=-90.0,
+        )
+        
+        angles = mapper.map_array(min_features)
+        
+        assert angles.shape == (21,)
+        assert np.all(angles >= 0), f"Found angles below 0: {angles[angles < 0]}"
+        assert np.all(angles <= 180), f"Found angles above 180: {angles[angles > 180]}"

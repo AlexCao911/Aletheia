@@ -173,7 +173,7 @@
   - [x] 12.3 Write property test for face detection fallback
     - **Property 6: Face Detection Fallback**
     - **Validates: Requirements 4.8**
-  - [ ]* 12.4 Write property test for fallback mode validity
+  - [x] 12.4 Write property test for fallback mode validity
     - **Property 12: Fallback Mode Validity**
     - **Validates: Requirements 6.8**
   - [x] 12.5 Implement configuration interface
