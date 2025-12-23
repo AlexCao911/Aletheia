@@ -21,10 +21,10 @@
     - Implement `decode()` method for command string to angles dict
     - Implement validation for angle range [0, 180]
     - _Requirements: 2.3, 2.6, 2.7, 2.8_
-  - [ ]* 2.2 Write property test for protocol round-trip
+  - [x] 2.2 Write property test for protocol round-trip
     - **Property 1: Protocol Round-Trip Consistency**
     - **Validates: Requirements 2.3, 2.7, 2.8**
-  - [ ]* 2.3 Write property test for angle range validation
+  - [x] 2.3 Write property test for angle range validation
     - **Property 2: Angle Range Validation**
     - **Validates: Requirements 2.6**
   - [x] 2.4 Implement SerialManager for USB communication

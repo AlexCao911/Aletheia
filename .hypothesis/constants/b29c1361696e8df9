@@ -1,0 +1,4 @@
+# file: /Users/caokaixiang/Downloads/Head_α2.0.33/Code/expression_control/inference.py
+# hypothesis_version: 6.148.7
+
+[-1.0, 0.0, 0.3, 0.5, 1.0, 10.0, 30.0, 90.0, 500.0, 1000.0, -1000, 180, 1000, '/dev/ttyACM0', 'BL', 'BR', 'CLL', 'CLR', 'CPUExecutionProvider', 'CUL', 'CUR', 'Camera not available', 'InferenceEngine', 'JL', 'JR', 'LI', 'LLL', 'LLR', 'LO', 'LR', 'LUL', 'LUR', 'RI', 'RO', 'TL', 'TON', 'TR', 'UD', 'cpu', 'cuda', 'error', 'eye_gaze_horizontal', 'eye_gaze_vertical', 'eyebrow_furrow', 'face_detected', 'features', 'fps', 'frame_count', 'latency_ms', 'left_eyebrow_height', 'lip_pucker', 'ltc_state', 'max_ms', 'mean_ms', 'mouth_open_ratio', 'mouth_width_ratio', 'p95_ms', 'right_eyebrow_height', 's4_states', 'sent', 'smile_intensity', 'using_fallback', 'using_neutral']
