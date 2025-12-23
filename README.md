@@ -1,8 +1,14 @@
-# Expression Control System
+# Aletheia
 
 [中文版](README.zh-CN.md) | English
 
-A vision-driven robot expression control system using MediaPipe and LNN-S4 neural networks for real-time facial expression recognition and servo control.
+> *"Aletheia" (ἀλήθεια) - Ancient Greek for "truth" or "disclosure". In philosophy, it represents the unconcealment of reality, the moment when what is hidden becomes visible.*
+
+**Aletheia** is a vision-driven robotic expression control system that bridges the gap between human emotion and robotic embodiment. By leveraging MediaPipe for facial feature extraction and Liquid Neural Networks with S4 layers (LNN-S4) for temporal modeling, Aletheia enables robots to mirror human expressions in real-time with remarkable fidelity.
+
+The system orchestrates 21 servo motors across three subsystems (eyes, eyebrows, and mouth) to create nuanced, lifelike facial expressions. Through continuous learning from visual input, Aletheia doesn't just replicate movements—it captures the essence of human expressiveness, making human-robot interaction more intuitive and emotionally resonant.
+
+## Expression Control System
 
 ## Overview
 
