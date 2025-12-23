@@ -845,3 +845,409 @@ class TestCheckpointRoundTrip:
             "best_val_loss should be numeric"
         assert isinstance(checkpoint["current_epoch"], int), \
             "current_epoch should be an int"
+
+
+class TestMetricComputationCorrectness:
+    """
+    **Feature: vision-expression-control, Property 10: Metric Computation Correctness**
+    
+    *For any* set of predicted and ground truth angle arrays, the computed MAE
+    SHALL equal the mean of absolute differences, and RMSE SHALL equal the
+    square root of mean squared differences.
+    
+    **Validates: Requirements 5.6**
+    
+    This property ensures that:
+    1. MAE is computed correctly as mean(|predictions - targets|)
+    2. RMSE is computed correctly as sqrt(mean((predictions - targets)^2))
+    3. Metrics are mathematically correct for all input shapes
+    4. Metrics handle edge cases (zeros, identical values, etc.)
+    5. Metrics produce finite, non-negative values
+    """
+    
+    @settings(max_examples=100)
+    @given(
+        predictions=st.lists(
+            st.floats(min_value=0.0, max_value=180.0, allow_nan=False, allow_infinity=False),
+            min_size=1,
+            max_size=1000
+        ),
+        targets=st.lists(
+            st.floats(min_value=0.0, max_value=180.0, allow_nan=False, allow_infinity=False),
+            min_size=1,
+            max_size=1000
+        )
+    )
+    def test_mae_computation_correctness(self, predictions, targets):
+        """
+        Property: MAE equals mean of absolute differences.
+        
+        For any set of predictions and targets, the computed MAE should be
+        exactly equal to the mean of the absolute differences between them.
+        
+        This verifies Requirement 5.6: Training pipeline includes validation
+        metrics for angle prediction accuracy (MAE).
+        """
+        from expression_control.trainer import compute_mae
+        
+        # Ensure same length
+        min_len = min(len(predictions), len(targets))
+        predictions = predictions[:min_len]
+        targets = targets[:min_len]
+        
+        # Convert to numpy arrays
+        pred_array = np.array(predictions, dtype=np.float32)
+        target_array = np.array(targets, dtype=np.float32)
+        
+        # Compute MAE using the function
+        mae = compute_mae(pred_array, target_array)
+        
+        # Compute expected MAE manually
+        expected_mae = np.mean(np.abs(pred_array - target_array))
+        
+        # Verify they are equal (within floating point tolerance)
+        assert np.isfinite(mae), f"MAE is not finite: {mae}"
+        assert mae >= 0.0, f"MAE should be non-negative, got {mae}"
+        assert np.isclose(mae, expected_mae, rtol=1e-5, atol=1e-6), \
+            f"MAE computation incorrect: got {mae}, expected {expected_mae}"
+    
+    @settings(max_examples=100)
+    @given(
+        predictions=st.lists(
+            st.floats(min_value=0.0, max_value=180.0, allow_nan=False, allow_infinity=False),
+            min_size=1,
+            max_size=1000
+        ),
+        targets=st.lists(
+            st.floats(min_value=0.0, max_value=180.0, allow_nan=False, allow_infinity=False),
+            min_size=1,
+            max_size=1000
+        )
+    )
+    def test_rmse_computation_correctness(self, predictions, targets):
+        """
+        Property: RMSE equals square root of mean squared differences.
+        
+        For any set of predictions and targets, the computed RMSE should be
+        exactly equal to sqrt(mean((predictions - targets)^2)).
+        
+        This verifies Requirement 5.6: Training pipeline includes validation
+        metrics for angle prediction accuracy (RMSE).
+        """
+        from expression_control.trainer import compute_rmse
+        
+        # Ensure same length
+        min_len = min(len(predictions), len(targets))
+        predictions = predictions[:min_len]
+        targets = targets[:min_len]
+        
+        # Convert to numpy arrays
+        pred_array = np.array(predictions, dtype=np.float32)
+        target_array = np.array(targets, dtype=np.float32)
+        
+        # Compute RMSE using the function
+        rmse = compute_rmse(pred_array, target_array)
+        
+        # Compute expected RMSE manually
+        expected_rmse = np.sqrt(np.mean((pred_array - target_array) ** 2))
+        
+        # Verify they are equal (within floating point tolerance)
+        assert np.isfinite(rmse), f"RMSE is not finite: {rmse}"
+        assert rmse >= 0.0, f"RMSE should be non-negative, got {rmse}"
+        assert np.isclose(rmse, expected_rmse, rtol=1e-5, atol=1e-6), \
+            f"RMSE computation incorrect: got {rmse}, expected {expected_rmse}"
+    
+    @settings(max_examples=100)
+    @given(
+        batch_size=st.integers(min_value=1, max_value=32),
+        seq_len=st.integers(min_value=1, max_value=50),
+        num_servos=st.integers(min_value=1, max_value=21)
+    )
+    def test_metrics_with_multidimensional_arrays(self, batch_size, seq_len, num_servos):
+        """
+        Property: Metrics work correctly with multidimensional arrays.
+        
+        The metric functions should handle arrays of any shape (flattened internally).
+        """
+        from expression_control.trainer import compute_mae, compute_rmse
+        
+        # Generate random predictions and targets
+        shape = (batch_size, seq_len, num_servos)
+        predictions = np.random.uniform(0, 180, size=shape).astype(np.float32)
+        targets = np.random.uniform(0, 180, size=shape).astype(np.float32)
+        
+        # Compute metrics
+        mae = compute_mae(predictions, targets)
+        rmse = compute_rmse(predictions, targets)
+        
+        # Compute expected values manually
+        expected_mae = np.mean(np.abs(predictions - targets))
+        expected_rmse = np.sqrt(np.mean((predictions - targets) ** 2))
+        
+        # Verify
+        assert np.isclose(mae, expected_mae, rtol=1e-5, atol=1e-6), \
+            f"MAE incorrect for shape {shape}: got {mae}, expected {expected_mae}"
+        assert np.isclose(rmse, expected_rmse, rtol=1e-5, atol=1e-6), \
+            f"RMSE incorrect for shape {shape}: got {rmse}, expected {expected_rmse}"
+    
+    def test_mae_with_identical_values(self):
+        """
+        Unit test: MAE is zero when predictions equal targets.
+        
+        This is a specific edge case that should always hold.
+        """
+        from expression_control.trainer import compute_mae
+        
+        # Create identical arrays
+        values = np.array([45.0, 90.0, 135.0, 180.0, 0.0], dtype=np.float32)
+        
+        mae = compute_mae(values, values)
+        
+        assert mae == 0.0, f"MAE should be 0 for identical values, got {mae}"
+    
+    def test_rmse_with_identical_values(self):
+        """
+        Unit test: RMSE is zero when predictions equal targets.
+        
+        This is a specific edge case that should always hold.
+        """
+        from expression_control.trainer import compute_rmse
+        
+        # Create identical arrays
+        values = np.array([45.0, 90.0, 135.0, 180.0, 0.0], dtype=np.float32)
+        
+        rmse = compute_rmse(values, values)
+        
+        assert rmse == 0.0, f"RMSE should be 0 for identical values, got {rmse}"
+    
+    def test_mae_with_known_values(self):
+        """
+        Unit test: MAE computation with known values.
+        
+        Test with a simple example where we can manually verify the result.
+        """
+        from expression_control.trainer import compute_mae
+        
+        predictions = np.array([10.0, 20.0, 30.0, 40.0], dtype=np.float32)
+        targets = np.array([15.0, 25.0, 35.0, 45.0], dtype=np.float32)
+        
+        # Expected MAE: mean(|10-15|, |20-25|, |30-35|, |40-45|) = mean(5, 5, 5, 5) = 5.0
+        mae = compute_mae(predictions, targets)
+        
+        assert np.isclose(mae, 5.0, rtol=1e-5), \
+            f"MAE should be 5.0, got {mae}"
+    
+    def test_rmse_with_known_values(self):
+        """
+        Unit test: RMSE computation with known values.
+        
+        Test with a simple example where we can manually verify the result.
+        """
+        from expression_control.trainer import compute_rmse
+        
+        predictions = np.array([10.0, 20.0, 30.0, 40.0], dtype=np.float32)
+        targets = np.array([13.0, 24.0, 35.0, 48.0], dtype=np.float32)
+        
+        # Differences: [3, 4, 5, 8]
+        # Squared: [9, 16, 25, 64]
+        # Mean: (9 + 16 + 25 + 64) / 4 = 114 / 4 = 28.5
+        # RMSE: sqrt(28.5) ≈ 5.3385
+        expected_rmse = np.sqrt(28.5)
+        
+        rmse = compute_rmse(predictions, targets)
+        
+        assert np.isclose(rmse, expected_rmse, rtol=1e-5), \
+            f"RMSE should be {expected_rmse:.4f}, got {rmse}"
+    
+    @settings(max_examples=100)
+    @given(
+        predictions=st.lists(
+            st.floats(min_value=0.0, max_value=180.0, allow_nan=False, allow_infinity=False),
+            min_size=1,
+            max_size=100
+        )
+    )
+    def test_mae_is_always_non_negative(self, predictions):
+        """
+        Property: MAE is always non-negative.
+        
+        By definition, MAE is the mean of absolute values, so it must be >= 0.
+        """
+        from expression_control.trainer import compute_mae
+        
+        # Create targets (can be anything)
+        targets = np.random.uniform(0, 180, size=len(predictions)).astype(np.float32)
+        pred_array = np.array(predictions, dtype=np.float32)
+        
+        mae = compute_mae(pred_array, targets)
+        
+        assert mae >= 0.0, f"MAE should be non-negative, got {mae}"
+    
+    @settings(max_examples=100)
+    @given(
+        predictions=st.lists(
+            st.floats(min_value=0.0, max_value=180.0, allow_nan=False, allow_infinity=False),
+            min_size=1,
+            max_size=100
+        )
+    )
+    def test_rmse_is_always_non_negative(self, predictions):
+        """
+        Property: RMSE is always non-negative.
+        
+        By definition, RMSE is the square root of a mean of squares, so it must be >= 0.
+        """
+        from expression_control.trainer import compute_rmse
+        
+        # Create targets (can be anything)
+        targets = np.random.uniform(0, 180, size=len(predictions)).astype(np.float32)
+        pred_array = np.array(predictions, dtype=np.float32)
+        
+        rmse = compute_rmse(pred_array, targets)
+        
+        assert rmse >= 0.0, f"RMSE should be non-negative, got {rmse}"
+    
+    @settings(max_examples=100)
+    @given(
+        predictions=st.lists(
+            st.floats(min_value=0.0, max_value=180.0, allow_nan=False, allow_infinity=False),
+            min_size=2,
+            max_size=100
+        ),
+        targets=st.lists(
+            st.floats(min_value=0.0, max_value=180.0, allow_nan=False, allow_infinity=False),
+            min_size=2,
+            max_size=100
+        )
+    )
+    def test_rmse_greater_than_or_equal_to_mae(self, predictions, targets):
+        """
+        Property: RMSE >= MAE (Root Mean Square >= Mean Absolute).
+        
+        This is a mathematical property that should always hold:
+        sqrt(mean(x^2)) >= mean(|x|) for any x.
+        """
+        from expression_control.trainer import compute_mae, compute_rmse
+        
+        # Ensure same length
+        min_len = min(len(predictions), len(targets))
+        predictions = predictions[:min_len]
+        targets = targets[:min_len]
+        
+        pred_array = np.array(predictions, dtype=np.float32)
+        target_array = np.array(targets, dtype=np.float32)
+        
+        mae = compute_mae(pred_array, target_array)
+        rmse = compute_rmse(pred_array, target_array)
+        
+        # RMSE should be >= MAE (with small tolerance for floating point)
+        assert rmse >= mae - 1e-6, \
+            f"RMSE ({rmse}) should be >= MAE ({mae})"
+    
+    def test_mae_with_all_zeros(self):
+        """
+        Unit test: MAE with all zero predictions and targets.
+        
+        Edge case: both arrays are all zeros.
+        """
+        from expression_control.trainer import compute_mae
+        
+        predictions = np.zeros(10, dtype=np.float32)
+        targets = np.zeros(10, dtype=np.float32)
+        
+        mae = compute_mae(predictions, targets)
+        
+        assert mae == 0.0, f"MAE should be 0 for all zeros, got {mae}"
+    
+    def test_rmse_with_all_zeros(self):
+        """
+        Unit test: RMSE with all zero predictions and targets.
+        
+        Edge case: both arrays are all zeros.
+        """
+        from expression_control.trainer import compute_rmse
+        
+        predictions = np.zeros(10, dtype=np.float32)
+        targets = np.zeros(10, dtype=np.float32)
+        
+        rmse = compute_rmse(predictions, targets)
+        
+        assert rmse == 0.0, f"RMSE should be 0 for all zeros, got {rmse}"
+    
+    def test_mae_with_single_value(self):
+        """
+        Unit test: MAE with single value arrays.
+        
+        Edge case: arrays with only one element.
+        """
+        from expression_control.trainer import compute_mae
+        
+        predictions = np.array([100.0], dtype=np.float32)
+        targets = np.array([90.0], dtype=np.float32)
+        
+        mae = compute_mae(predictions, targets)
+        
+        assert np.isclose(mae, 10.0, rtol=1e-5), \
+            f"MAE should be 10.0, got {mae}"
+    
+    def test_rmse_with_single_value(self):
+        """
+        Unit test: RMSE with single value arrays.
+        
+        Edge case: arrays with only one element.
+        """
+        from expression_control.trainer import compute_rmse
+        
+        predictions = np.array([100.0], dtype=np.float32)
+        targets = np.array([90.0], dtype=np.float32)
+        
+        rmse = compute_rmse(predictions, targets)
+        
+        assert np.isclose(rmse, 10.0, rtol=1e-5), \
+            f"RMSE should be 10.0, got {rmse}"
+    
+    @settings(max_examples=100)
+    @given(
+        constant_error=st.floats(min_value=0.1, max_value=50.0, allow_nan=False, allow_infinity=False),
+        array_size=st.integers(min_value=1, max_value=100)
+    )
+    def test_mae_with_constant_error(self, constant_error, array_size):
+        """
+        Property: MAE equals the constant error when all errors are the same.
+        
+        If all predictions differ from targets by the same amount, MAE should
+        equal that amount.
+        """
+        from expression_control.trainer import compute_mae
+        
+        # Create arrays where all errors are constant
+        targets = np.random.uniform(0, 180 - constant_error, size=array_size).astype(np.float32)
+        predictions = targets + constant_error
+        
+        mae = compute_mae(predictions, targets)
+        
+        assert np.isclose(mae, constant_error, rtol=1e-5, atol=1e-6), \
+            f"MAE should equal constant error {constant_error}, got {mae}"
+    
+    @settings(max_examples=100)
+    @given(
+        constant_error=st.floats(min_value=0.1, max_value=50.0, allow_nan=False, allow_infinity=False),
+        array_size=st.integers(min_value=1, max_value=100)
+    )
+    def test_rmse_with_constant_error(self, constant_error, array_size):
+        """
+        Property: RMSE equals the constant error when all errors are the same.
+        
+        If all predictions differ from targets by the same amount, RMSE should
+        equal that amount (since sqrt(mean(c^2)) = c for constant c).
+        """
+        from expression_control.trainer import compute_rmse
+        
+        # Create arrays where all errors are constant
+        targets = np.random.uniform(0, 180 - constant_error, size=array_size).astype(np.float32)
+        predictions = targets + constant_error
+        
+        rmse = compute_rmse(predictions, targets)
+        
+        assert np.isclose(rmse, constant_error, rtol=1e-5, atol=1e-6), \
+            f"RMSE should equal constant error {constant_error}, got {rmse}"

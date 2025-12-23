@@ -132,7 +132,7 @@
   - [x] 10.2 Write property test for checkpoint round-trip
     - **Property 9: Checkpoint Round-Trip Consistency**
     - **Validates: Requirements 5.4**
-  - [ ]* 10.3 Write property test for metric computation
+  - [x] 10.3 Write property test for metric computation
     - **Property 10: Metric Computation Correctness**
     - **Validates: Requirements 5.6**
   - [x] 10.4 Implement ONNX export functionality
