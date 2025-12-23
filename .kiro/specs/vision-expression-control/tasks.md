@@ -82,7 +82,7 @@
     - Implement `to_dict()`, `from_dict()`, `to_json()`, `from_json()` methods
     - Define JSON schema for dataset format
     - _Requirements: 3.2, 3.7_
-  - [ ]* 7.2 Write property test for training data round-trip
+  - [x] 7.2 Write property test for training data round-trip
     - **Property 3: Training Data Round-Trip Consistency**
     - **Validates: Requirements 3.6, 3.7**
   - [x] 7.3 Implement DataCollector class
