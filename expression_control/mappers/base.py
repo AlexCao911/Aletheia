@@ -34,26 +34,22 @@ class FeatureToAngleMapper(ABC):
     @abstractmethod
     def map(self, features: FaceFeatures) -> np.ndarray:
         """
-        Map facial features to servo angles.
+        Convert facial features into a 21-element array of servo angles.
         
-        Args:
-            features: FaceFeatures object from MediaPipe extractor.
-            
+        Parameters:
+            features (FaceFeatures): Facial keypoints/features produced by the MediaPipe extractor.
+        
         Returns:
-            numpy array of shape (21,) with servo angles in range [0, 180].
-            Order follows ServoCommandProtocol.SERVO_ORDER.
+            numpy.ndarray: Array of shape (21,) containing servo angles in degrees (0–180). Values are ordered according to SERVO_ORDER.
         """
         pass
     
     @abstractmethod
     def reset(self) -> None:
         """
-        Reset internal state.
+        Reset the mapper's internal temporal and stateful data to their defaults.
         
-        Call this when:
-        - Face detection is lost and regained
-        - Starting a new video sequence
-        - Switching between different faces
+        Call when face tracking is lost or regained, when starting a new video sequence, or when switching between different faces.
         """
         pass
     
@@ -69,15 +65,13 @@ class FeatureToAngleMapper(ABC):
     
     def map_to_dict(self, features: FaceFeatures) -> Dict[str, int]:
         """
-        Map facial features to servo angles as a dictionary.
+        Map facial features to a dictionary of servo angles.
         
-        Convenience method that converts array output to named dictionary.
+        Parameters:
+            features (FaceFeatures): Facial feature measurements (14-dim) from the MediaPipe extractor.
         
-        Args:
-            features: FaceFeatures object from MediaPipe extractor.
-            
         Returns:
-            Dictionary mapping servo names to integer angles.
+            Dict[str, int]: Mapping from servo name to its angle in degrees, with each angle rounded to the nearest integer.
         """
         angles = self.map(features)
         return {
@@ -86,7 +80,14 @@ class FeatureToAngleMapper(ABC):
         }
     
     def get_neutral_dict(self) -> Dict[str, int]:
-        """Get neutral angles as a dictionary."""
+        """
+        Provide neutral servo angles as a mapping from servo name to integer angle.
+        
+        The mapping keys follow SERVO_ORDER; each value is the neutral angle in degrees rounded to the nearest integer (expected range 0–180).
+        
+        Returns:
+            Dict[str, int]: Dictionary mapping servo name to rounded neutral angle.
+        """
         angles = self.get_neutral_angles()
         return {
             name: int(round(angles[i]))

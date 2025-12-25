@@ -35,11 +35,13 @@ class LiquidS4Mapper(FeatureToAngleMapper):
         neutral_angles: Optional[np.ndarray] = None,
     ):
         """
-        Initialize with ONNX model.
+        Load an ONNX model and initialize mapper state.
         
-        Args:
-            onnx_path: Path to exported .onnx model file.
-            neutral_angles: Optional neutral angles. Defaults to 90 for all.
+        Creates an ONNX Runtime InferenceSession from `onnx_path` and records the model's first input name for inference. Initializes the mapper's neutral angles to `neutral_angles` if provided, otherwise to 90.0 degrees for each of `NUM_SERVOS`. Raises ImportError if `onnxruntime` is not installed.
+        
+        Parameters:
+            onnx_path (str): Filesystem path to the exported ONNX model.
+            neutral_angles (Optional[np.ndarray]): Optional array of neutral servo angles; used as fallback when mapping.
         """
         try:
             import onnxruntime as ort
@@ -56,7 +58,17 @@ class LiquidS4Mapper(FeatureToAngleMapper):
             np.full(self.NUM_SERVOS, 90.0, dtype=np.float64)
     
     def map(self, features: FaceFeatures) -> np.ndarray:
-        """Map facial features to servo angles using ONNX model."""
+        """
+        Map facial features to servo angles using the loaded ONNX model.
+        
+        Converts the provided FaceFeatures into a 21-element array of servo angles in degrees; values are clipped to the valid range 0.0–180.0.
+        
+        Parameters:
+            features (FaceFeatures): Facial feature values used as model input.
+        
+        Returns:
+            np.ndarray: Shape (21,) array of servo angles in degrees, dtype float64, clipped to [0.0, 180.0].
+        """
         # Prepare input: (batch=1, seq_len=1, features=14)
         feature_array = features.to_array().astype(np.float32)
         x = feature_array.reshape(1, 1, -1)
@@ -72,14 +84,17 @@ class LiquidS4Mapper(FeatureToAngleMapper):
     
     def reset(self) -> None:
         """
-        Reset internal state.
+        Perform a reset of any mapper-held runtime state.
         
-        Note: ONNX models are stateless per-call. For stateful inference
-        with S4/LTC, the model should be exported with state handling,
-        or use a sequence of frames as input.
+        For ONNX-backed models this is a no-op because the exported model does not expose persistent inferencer state per instance. For stateful S4/LTC inference, embed state handling into the exported model or provide input sequences that carry state; this method does not modify or clear any external model state.
         """
         pass
     
     def get_neutral_angles(self) -> np.ndarray:
-        """Get neutral angles."""
+        """
+        Return the mapper's neutral servo angles.
+        
+        Returns:
+            np.ndarray: A copy of the internal neutral angles array (shape (NUM_SERVOS,), degrees).
+        """
         return self._neutral.copy()
