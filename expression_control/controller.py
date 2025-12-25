@@ -72,11 +72,11 @@ class ExpressionController:
         config: Optional[ControllerConfig] = None,
     ):
         """
-        Initialize the controller.
+        Create a new ExpressionController with an optional feature-to-angle mapper and configuration.
         
-        Args:
-            mapper: Feature-to-angle mapper. Defaults to RuleMapper.
-            config: Controller configuration. Uses defaults if None.
+        Parameters:
+            mapper (Optional[FeatureToAngleMapper]): Mapper that converts extracted face features into servo angles. If omitted, a default RuleMapper is used.
+            config (Optional[ControllerConfig]): Controller configuration. If omitted, a default ControllerConfig() is created.
         """
         if not CV2_AVAILABLE:
             raise ImportError("OpenCV is required: pip install opencv-python")
@@ -100,7 +100,15 @@ class ExpressionController:
         self._on_angles: Optional[Callable] = None
     
     def _init_camera(self) -> bool:
-        """Initialize camera capture."""
+        """
+        Ensure the configured camera is opened and configured for capture.
+        
+        If the camera is not already initialized, opens OpenCV VideoCapture with the configured camera_id
+        and applies frame width, height, and target FPS settings.
+        
+        Returns:
+            True if the camera is opened and configured successfully, False otherwise.
+        """
         if self._camera is not None:
             return True
         
@@ -115,7 +123,15 @@ class ExpressionController:
         return True
     
     def _init_extractor(self) -> bool:
-        """Initialize feature extractor."""
+        """
+        Lazily create and store the face feature extractor on the controller.
+        
+        If an extractor is already present this is a no-op. Otherwise attempts to construct a
+        FaceFeatureExtractor and assign it to self._extractor.
+        
+        Returns:
+            True if the extractor is available after the call, False if initialization failed.
+        """
         if self._extractor is not None:
             return True
         
@@ -126,7 +142,16 @@ class ExpressionController:
             return False
     
     def _init_serial(self) -> bool:
-        """Initialize serial connection."""
+        """
+        Initialize and connect the serial manager if a serial port is configured.
+        
+        If no serial port is configured, this function treats serial as disabled and returns True.
+        When a serial port is configured and no serial manager exists yet, it creates a SerialManager,
+        assigns it to self._serial, and attempts to connect.
+        
+        Returns:
+            True if serial is disabled, already initialized, or the connection succeeded; False if connecting failed.
+        """
         if self.config.serial_port is None:
             return True  # Serial disabled
         
@@ -141,10 +166,12 @@ class ExpressionController:
     
     def initialize(self) -> bool:
         """
-        Initialize all components.
+        Initialize the camera, feature extractor, and optional serial connection.
+        
+        Attempts to initialize the camera and the face feature extractor; also tries to establish a serial connection if configured. A failure to initialize the camera or extractor causes initialization to fail; a failure to connect serial is tolerated (the controller continues with serial disabled).
         
         Returns:
-            True if all components initialized successfully.
+            True if the camera and feature extractor were initialized successfully (serial may be unavailable), False otherwise.
         """
         if not self._init_camera():
             print(f"Failed to open camera {self.config.camera_id}")
@@ -162,13 +189,15 @@ class ExpressionController:
     
     def process_frame(self, frame: np.ndarray) -> Optional[Dict[str, int]]:
         """
-        Process a single frame.
+        Compute servo angle commands from a captured BGR camera frame.
         
-        Args:
-            frame: BGR image from camera.
-            
+        Processes the provided BGR image to extract facial features and map them to a dictionary of servo angles. If the feature extractor is not initialized or no face is detected, this returns None unless the time since the last detected face exceeds the configured face_lost_timeout and send_neutral_on_lost is True, in which case the mapper's neutral angles are returned.
+        
+        Parameters:
+            frame (np.ndarray): BGR image from the camera (HxWx3).
+        
         Returns:
-            Dictionary of servo angles, or None if no face detected.
+            dict[str, int] | None: Mapping of servo identifiers to angle values, or `None` when no angles should be produced.
         """
         if self._extractor is None:
             return None
@@ -198,13 +227,13 @@ class ExpressionController:
     
     def send_angles(self, angles: Dict[str, int]) -> bool:
         """
-        Send angles to robot via serial.
+        Transmit servo angles to the robot over serial if a serial connection is configured.
         
-        Args:
-            angles: Dictionary mapping servo names to angles.
-            
+        Parameters:
+            angles (Dict[str, int]): Mapping from servo identifiers to target angles (integer degrees).
+        
         Returns:
-            True if sent successfully (or serial disabled).
+            bool: `True` if the command was sent (or serial is disabled), `False` if sending failed.
         """
         if self._serial is None:
             return True
@@ -214,10 +243,10 @@ class ExpressionController:
     
     def step(self) -> Optional[Dict[str, int]]:
         """
-        Run one iteration of the control loop.
+        Run a single control-loop iteration: capture one camera frame, process it into servo angles, invoke callbacks, and send angles to the robot if available.
         
         Returns:
-            Servo angles if face detected, None otherwise.
+            Optional[Dict[str, int]]: Mapping of servo identifiers to angle degrees when a face is detected; `None` if no frame was read or no angles were produced.
         """
         if self._camera is None:
             return None
@@ -251,12 +280,12 @@ class ExpressionController:
         on_angles: Optional[Callable] = None,
     ) -> None:
         """
-        Run the main control loop.
+        Run the controller main loop that captures camera frames, processes facial features into servo angles, sends angles to the robot, and optionally displays video.
         
-        Args:
-            show_video: Whether to display video window.
-            on_frame: Callback(frame, angles) called each frame.
-            on_angles: Callback(angles) called when angles are computed.
+        Parameters:
+            show_video (bool): If True, display a live video window with debug overlay and allow quitting with 'q'.
+            on_frame (Optional[Callable]): Optional callback invoked every frame as on_frame(frame, angles).
+            on_angles (Optional[Callable]): Optional callback invoked when angles are produced as on_angles(angles).
         """
         if not self.initialize():
             return
@@ -321,7 +350,17 @@ class ExpressionController:
             self.stop()
     
     def _draw_debug(self, frame: np.ndarray, angles: Dict[str, int]) -> None:
-        """Draw debug info on frame."""
+        """
+        Overlay runtime debug information and key servo angles onto the provided video frame.
+        
+        Parameters:
+            frame (np.ndarray): BGR image to draw overlays on; modified in place.
+            angles (Dict[str, int]): Mapping of servo angle values. Expected keys:
+                - 'JL' : jaw angle value
+                - 'CUL': smile (mouth) angle value
+                - 'LR' : left-right eye angle value
+                - 'UD' : up-down eye angle value
+        """
         fps = self._frame_count / (time.time() - self._start_time + 0.001)
         cv2.putText(frame, f"FPS: {fps:.1f}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
@@ -339,7 +378,11 @@ class ExpressionController:
             y += 20
     
     def stop(self) -> None:
-        """Stop the controller and release resources."""
+        """
+        Stop the controller and release all acquired resources.
+        
+        Closes and clears the camera, feature extractor, and serial connection (if present), destroys any OpenCV windows, and stops the run loop. If frames were processed, prints a brief summary with total frames and average FPS.
+        """
         self._running = False
         
         if self._camera is not None:
@@ -362,8 +405,24 @@ class ExpressionController:
                   f"({self._frame_count/elapsed:.1f} FPS)")
     
     def __enter__(self):
+        """
+        Enter context by initializing the controller and returning the controller instance.
+        
+        Initializes internal components (camera, extractor, optional serial) via initialize() and returns self for use as a context manager.
+        
+        Returns:
+            self: The initialized ExpressionController instance.
+        """
         self.initialize()
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exit the context manager, stop the controller, and release resources.
+        
+        Parameters:
+            exc_type (Optional[type]): Exception type if the block raised, otherwise None. Ignored.
+            exc_val (Optional[BaseException]): Exception instance if raised, otherwise None. Ignored.
+            exc_tb (Optional[types.TracebackType]): Traceback if an exception was raised, otherwise None. Ignored.
+        """
         self.stop()

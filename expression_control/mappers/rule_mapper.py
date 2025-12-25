@@ -40,12 +40,24 @@ class RuleMapperConfig:
     
     def __post_init__(self):
         # Set defaults if not provided
+        """
+        Ensure per-servo configurations are populated with defaults when none were provided.
+        
+        If `servo_configs` is empty or falsy after initialization, replaces it with the module's default servo configuration mapping produced by `_default_servo_configs()`.
+        """
         if not self.servo_configs:
             self.servo_configs = self._default_servo_configs()
     
     @staticmethod
     def _default_servo_configs() -> Dict[str, ServoConfig]:
-        """Default servo configurations."""
+        """
+        Return a dictionary of default ServoConfig instances for all supported servos.
+        
+        The mapping provides per-servo default neutral, min_angle, max_angle, and inversion settings for mouth, eyes, eyelids, and brows. Keys included: JL, JR, LUL, LUR, LLL, LLR, CUL, CUR, CLL, CLR, TON, LR, UD, TL, BL, TR, BR, LO, LI, RI, RO.
+        
+        Returns:
+            Dict[str, ServoConfig]: Mapping from servo name to its default ServoConfig.
+        """
         return {
             # Mouth servos
             "JL": ServoConfig(neutral=90, min_angle=60, max_angle=120),
@@ -91,10 +103,10 @@ class RuleMapper(FeatureToAngleMapper):
     
     def __init__(self, config: Optional[RuleMapperConfig] = None):
         """
-        Initialize the rule mapper.
+        Create a RuleMapper configured for converting facial features to servo angles.
         
-        Args:
-            config: Configuration object. Uses defaults if None.
+        Parameters:
+            config (Optional[RuleMapperConfig]): Configuration to customize mapping behavior; when `None`, a default `RuleMapperConfig` is used. The initializer also creates an internal TemporalSmoother using the config's `smooth_alpha` and the mapper's `NUM_SERVOS`.
         """
         self.config = config or RuleMapperConfig()
         self.smoother = TemporalSmoother(
@@ -103,7 +115,15 @@ class RuleMapper(FeatureToAngleMapper):
         )
     
     def _sigmoid(self, x: float) -> float:
-        """Sigmoid transformation for non-linear mapping."""
+        """
+        Apply a configurable sigmoid transform that maps an input in [0,1] to a non-linear value emphasizing deviations from 0.5.
+        
+        Parameters:
+            x (float): Input value (expected in the range 0.0 to 1.0).
+        
+        Returns:
+            float: Transformed value between 0 and 1 (exclusive) using the configured sigmoid steepness.
+        """
         k = self.config.sigmoid_k
         return 1.0 / (1.0 + np.exp(-k * (x - 0.5)))
     
@@ -114,7 +134,18 @@ class RuleMapper(FeatureToAngleMapper):
         input_min: float = 0.0,
         input_max: float = 1.0,
     ) -> float:
-        """Map a single value to servo angle."""
+        """
+        Map a normalized input value to a servo angle using the servo's configured range and optional inversion.
+        
+        Parameters:
+            value (float): Input value to map; expected within or near the range [input_min, input_max].
+            servo_name (str): Key identifying the servo in the mapper's `servo_configs`.
+            input_min (float): Minimum of the input range used for normalization (default 0.0).
+            input_max (float): Maximum of the input range used for normalization (default 1.0).
+        
+        Returns:
+            float: Servo angle clamped to the servo's [min_angle, max_angle].
+        """
         config = self.config.servo_configs[servo_name]
         
         # Normalize to [0, 1]
@@ -133,7 +164,23 @@ class RuleMapper(FeatureToAngleMapper):
         return float(np.clip(angle, config.min_angle, config.max_angle))
     
     def map(self, features: FaceFeatures) -> np.ndarray:
-        """Map facial features to servo angles."""
+        """
+        Convert FaceFeatures into an array of servo angles for every configured servo.
+        
+        The mapping applies per-servo rules (jaw, upper/lower lips, mouth corners, tongue, eye gaze,
+        eyelids, and eyebrows), optionally applies a sigmoid transform and per-servo inversion,
+        and then applies temporal smoothing if enabled in the mapper config.
+        
+        Parameters:
+            features (FaceFeatures): Facial measurements (e.g., mouth_open_ratio, smile_intensity,
+                mouth_width_ratio, eye_gaze_horizontal/vertical, left/right_eye_aspect_ratio,
+                left/right_eyebrow_height, eyebrow_furrow) used to compute servo targets.
+        
+        Returns:
+            np.ndarray: Array of angles (degrees) with shape (NUM_SERVOS,), ordered according to
+                the mapper's SERVO_ORDER. Each element is clamped to the corresponding servo's
+                configured [min_angle, max_angle].
+        """
         angles = np.zeros(self.NUM_SERVOS, dtype=np.float64)
         
         # === Jaw (indices 0-1) ===
@@ -198,11 +245,18 @@ class RuleMapper(FeatureToAngleMapper):
         return angles
     
     def reset(self) -> None:
-        """Reset smoother state."""
+        """
+        Reset the internal temporal smoother to its initial state.
+        """
         self.smoother.reset()
     
     def get_neutral_angles(self) -> np.ndarray:
-        """Get neutral angles for all servos."""
+        """
+        Return an array of neutral angles for every servo in the mapper's defined order.
+        
+        Returns:
+            neutral_angles (np.ndarray): 1-D array of neutral angles (dtype float64) ordered according to `SERVO_ORDER`.
+        """
         return np.array([
             self.config.servo_configs[name].neutral
             for name in self.SERVO_ORDER
