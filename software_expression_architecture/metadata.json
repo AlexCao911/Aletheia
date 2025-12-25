@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Copy of Copy of greek style(with mobile responsive)2",
+  "description": "A 21-DOF Robot Facial Expression Control System based on FACS principles, featuring real-time visualization and AI-powered emotion generation.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

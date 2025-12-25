@@ -1,4 +1,0 @@
-# file: /Users/caokaixiang/Downloads/Head_α2.0.33/Code/expression_control/models/__init__.py
-# hypothesis_version: 6.148.7
-
-['LNNS4Config', 'LiquidS4Model', 'S4Block', 'S4Layer', 'create_model', 'make_hippo_matrix']

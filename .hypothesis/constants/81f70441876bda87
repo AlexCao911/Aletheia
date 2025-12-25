@@ -1,4 +1,0 @@
-# file: /Users/caokaixiang/Downloads/Head_α2.0.33/Code/expression_control/serial_manager.py
-# hypothesis_version: 6.148.7
-
-[0.1, 1.0, 115200, '/dev/ttyACM0', 'SerialManager', 'serial.Serial', 'utf-8']

@@ -1,4 +1,0 @@
-# file: /Users/caokaixiang/Downloads/Head_α2.0.33/Code/expression_control/data.py
-# hypothesis_version: 6.148.7
-
-[30.0, '1.0', 'TrainingDataSample', 'TrainingDataset', 'angry', 'created_at', 'expression_label', 'eye_gaze_horizontal', 'eye_gaze_vertical', 'eyebrow_furrow', 'features', 'fps', 'happy', 'head_pitch', 'head_roll', 'head_yaw', 'left_eyebrow_height', 'lip_pucker', 'mouth_open_ratio', 'mouth_width_ratio', 'neutral', 'r', 'right_eyebrow_height', 'sad', 'samples', 'servo_angles', 'servo_order', 'smile_intensity', 'surprised', 'timestamp', 'total_samples', 'utf-8', 'version', 'video_frame_path', 'w']
