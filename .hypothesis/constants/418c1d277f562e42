@@ -1,4 +1,0 @@
-# file: /Users/caokaixiang/Downloads/Head_α2.0.33/Code/expression_control/trainer.py
-# hypothesis_version: 6.148.7
-
-[0.0, 0.0001, 1.0, 180.0, 1024, 'angles', 'batch', 'best_model.pt', 'best_val_loss', 'checkpoints', 'config', 'cpu', 'cuda', 'current_epoch', 'epoch', 'features', 'history', 'inf', 'learning_rate', 'ltc_state', 'mae', 'model_state_dict', 'optimizer_state_dict', 'patience_counter', 'rmse', 's4_states', 'scheduler_state_dict', 'seq_len', 'train_loss', 'val_loss']
